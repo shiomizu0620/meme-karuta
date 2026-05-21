@@ -1,0 +1,362 @@
+# frozen_string_literal: true
+require "net/http"
+require "json"
+require "time"
+require "open3"
+require "fileutils"
+
+# ---- 設定 ----
+
+SERVICES = {
+  gateway:    { port: 8080, url: "http://localhost:8080/health",  container: "meme-karuta-gateway-1" },
+  realtime:   { port: 4000, url: "http://localhost:4000/health",  container: "meme-karuta-realtime-1" },
+  judge:      { port: 5002, url: "http://localhost:5002/health",  container: "meme-karuta-judge-1" },
+  card_gen:   { port: 5000, url: "http://localhost:5000/health",  container: "meme-karuta-card_gen-1" },
+  shuffle:    { port: 5001, url: "http://localhost:5001/health",  container: "meme-karuta-shuffle-1" },
+  queue:      { port: 5003, url: "http://localhost:5003/health",  container: "meme-karuta-queue-1" },
+  serializer: { port: 5004, url: "http://localhost:5004/health",  container: "meme-karuta-serializer-1" },
+}.freeze
+
+COMPOSE_FILE = File.expand_path("../../docker-compose.yml", __dir__)
+LOG_DIR      = File.expand_path("../../logs", __dir__)
+HEALTH_TIMEOUT_SEC = 5
+MAX_RETRIES        = 3
+
+# ---- ヘルパー ----
+
+def run_cmd(cmd, desc: nil)
+  puts desc ? ">>> #{desc}" : ">>> #{cmd}"
+  stdout, stderr, status = Open3.capture3(cmd)
+  puts stdout unless stdout.empty?
+  unless status.success?
+    $stderr.puts "ERROR: #{stderr}" unless stderr.empty?
+    raise "Command failed (exit #{status.exitstatus}): #{cmd}"
+  end
+  stdout
+end
+
+def docker_compose(args)
+  run_cmd("docker compose -f #{COMPOSE_FILE} #{args}")
+end
+
+def http_get_json(url, timeout: HEALTH_TIMEOUT_SEC)
+  uri = URI.parse(url)
+  Net::HTTP.start(uri.host, uri.port, open_timeout: timeout, read_timeout: timeout) do |http|
+    response = http.get(uri.path.empty? ? "/" : uri.path)
+    { status: response.code.to_i, body: JSON.parse(response.body) }
+  end
+rescue => e
+  { status: 0, error: e.message }
+end
+
+def colorize(text, color)
+  codes = { red: 31, green: 32, yellow: 33, cyan: 36, bold: 1 }
+  "\e[#{codes.fetch(color, 0)}m#{text}\e[0m"
+end
+
+def banner(msg)
+  line = "=" * 50
+  puts colorize(line, :cyan)
+  puts colorize("  #{msg}", :bold)
+  puts colorize(line, :cyan)
+end
+
+# ---- Deploy namespace ----
+
+namespace :deploy do
+  desc "全サービスをdocker composeで起動"
+  task :start do
+    banner "Starting all services"
+    docker_compose("up -d --remove-orphans")
+    puts colorize("All services started.", :green)
+  end
+
+  desc "全サービスを停止"
+  task :stop do
+    banner "Stopping all services"
+    docker_compose("down")
+    puts colorize("All services stopped.", :yellow)
+  end
+
+  desc "全サービスを再起動"
+  task restart: %i[stop start]
+
+  desc "Dockerイメージをビルド（キャッシュなし）"
+  task :build do
+    banner "Building Docker images (no-cache)"
+    docker_compose("build --no-cache")
+    puts colorize("Build complete.", :green)
+  end
+
+  desc "通常ビルド（キャッシュあり）"
+  task :build_fast do
+    banner "Building Docker images"
+    docker_compose("build")
+    puts colorize("Build complete.", :green)
+  end
+
+  desc "git pull でコードを最新化"
+  task :pull do
+    banner "Pulling latest code"
+    run_cmd("git pull --ff-only", desc: "git pull")
+    puts colorize("Code updated.", :green)
+  end
+
+  desc "本番フルデプロイ: pull → build → restart → health check"
+  task production: %i[pull build restart] do
+    Rake::Task["health:check"].invoke
+    puts colorize("Production deploy complete!", :green)
+  end
+
+  desc "ローリングアップデート（ダウンタイムなし試み）"
+  task :rolling do
+    banner "Rolling update"
+    SERVICES.each_key do |svc|
+      puts "  Updating #{svc}..."
+      docker_compose("up -d --no-deps #{svc}")
+      sleep 2
+      url = SERVICES[svc][:url]
+      result = http_get_json(url)
+      if result[:status] == 200
+        puts colorize("  #{svc}: OK", :green)
+      else
+        puts colorize("  #{svc}: WARN - #{result[:error]}", :yellow)
+      end
+    end
+    puts colorize("Rolling update complete.", :green)
+  end
+
+  desc "特定サービスだけ再起動 (rake deploy:restart_one[gateway])"
+  task :restart_one, [:service] do |_, args|
+    svc = args[:service]
+    raise "Usage: rake deploy:restart_one[SERVICE_NAME]" unless svc
+    banner "Restarting #{svc}"
+    docker_compose("restart #{svc}")
+    puts colorize("#{svc} restarted.", :green)
+  end
+
+  desc "コンテナのステータス表示"
+  task :status do
+    banner "Container Status"
+    docker_compose("ps")
+  end
+
+  desc "イメージ・ボリュームをクリーンアップ"
+  task :clean do
+    banner "Cleaning up"
+    docker_compose("down --volumes --remove-orphans")
+    run_cmd("docker image prune -f")
+    puts colorize("Cleanup complete.", :green)
+  end
+end
+
+# ---- Health namespace ----
+
+namespace :health do
+  desc "全サービスのヘルスチェック（一回）"
+  task :check do
+    banner "Health Check"
+    results = check_all_services
+    print_health_report(results)
+    failed = results.select { |_, r| r[:ok] == false }
+    exit 1 unless failed.empty?
+  end
+
+  desc "ヘルスチェックをリトライ付きで実行"
+  task :check_retry do
+    banner "Health Check (with retry)"
+    MAX_RETRIES.times do |i|
+      puts "Attempt #{i + 1}/#{MAX_RETRIES}..."
+      results = check_all_services
+      failed  = results.select { |_, r| r[:ok] == false }
+      if failed.empty?
+        print_health_report(results)
+        puts colorize("All services healthy!", :green)
+        exit 0
+      end
+      puts colorize("#{failed.size} service(s) unhealthy. Retrying in 5s...", :yellow)
+      sleep 5
+    end
+    puts colorize("Health check failed after #{MAX_RETRIES} attempts.", :red)
+    exit 1
+  end
+
+  desc "ヘルスチェックを連続実行（監視モード、Ctrl+Cで停止）"
+  task :watch do
+    puts "Watching services (Ctrl+C to stop)..."
+    loop do
+      system("clear") || system("cls")
+      banner "Meme Karuta Monitor - #{Time.now.strftime('%Y-%m-%d %H:%M:%S')}"
+      results = check_all_services
+      print_health_report(results)
+      unhealthy = results.count { |_, r| r[:ok] == false }
+      status_line = unhealthy.zero? ? colorize("All systems operational", :green) : colorize("#{unhealthy} service(s) down!", :red)
+      puts "\n#{status_line}"
+      sleep 5
+    end
+  rescue Interrupt
+    puts "\nStopped monitoring."
+  end
+
+  desc "単一サービスのヘルスチェック (rake health:service[judge])"
+  task :service, [:name] do |_, args|
+    name = args[:name]&.to_sym
+    raise "Usage: rake health:service[SERVICE_NAME]" unless name && SERVICES.key?(name)
+    cfg    = SERVICES[name]
+    result = http_get_json(cfg[:url])
+    ok = result[:status] == 200
+    puts ok ? colorize("#{name}: OK (#{result[:status]})", :green) : colorize("#{name}: FAIL (#{result[:error]})", :red)
+    exit 1 unless ok
+  end
+end
+
+def check_all_services
+  SERVICES.transform_values do |cfg|
+    result = http_get_json(cfg[:url])
+    { ok: result[:status] == 200, code: result[:status], error: result[:error] }
+  end
+end
+
+def print_health_report(results)
+  max_len = results.keys.map(&:to_s).map(&:length).max
+  results.each do |name, r|
+    padded = name.to_s.ljust(max_len)
+    if r[:ok]
+      puts "  #{colorize(padded, :green)}  #{colorize('●  UP', :green)}"
+    else
+      puts "  #{colorize(padded, :red)}   #{colorize('●  DOWN', :red)}  (#{r[:error] || "HTTP #{r[:code]}"})"
+    end
+  end
+end
+
+# ---- Logs namespace ----
+
+namespace :logs do
+  desc "全サービスのログを表示 (rake logs:tail)"
+  task :tail do
+    docker_compose("logs --follow --tail=100")
+  end
+
+  desc "特定サービスのログを表示 (rake logs:tail_service[gateway])"
+  task :tail_service, [:service] do |_, args|
+    svc = args[:service]
+    raise "Usage: rake logs:tail_service[SERVICE_NAME]" unless svc
+    docker_compose("logs --follow --tail=200 #{svc}")
+  end
+
+  desc "エラーログだけ抽出して表示"
+  task :errors do
+    banner "Error Log Summary"
+    SERVICES.each_key do |svc|
+      begin
+        out = run_cmd("docker compose -f #{COMPOSE_FILE} logs --tail=500 #{svc}")
+        errors = out.lines.select { |l| l.match?(/error|ERROR|FATAL|panic/i) }
+        unless errors.empty?
+          puts colorize("\n#{svc}:", :red)
+          errors.first(10).each { |l| print "  #{l}" }
+          puts "  ... (#{errors.size} errors total)" if errors.size > 10
+        end
+      rescue => e
+        puts colorize("  #{svc}: Could not read logs (#{e.message})", :yellow)
+      end
+    end
+  end
+
+  desc "ローカルにログを保存"
+  task :archive do
+    FileUtils.mkdir_p(LOG_DIR)
+    timestamp = Time.now.strftime("%Y%m%d_%H%M%S")
+    SERVICES.each_key do |svc|
+      log_file = File.join(LOG_DIR, "#{svc}_#{timestamp}.log")
+      begin
+        out = run_cmd("docker compose -f #{COMPOSE_FILE} logs --tail=1000 #{svc}")
+        File.write(log_file, out)
+        puts "Saved #{svc} log -> #{log_file}"
+      rescue => e
+        puts colorize("Could not archive #{svc}: #{e.message}", :yellow)
+      end
+    end
+    puts colorize("Log archive complete: #{LOG_DIR}", :green)
+  end
+end
+
+# ---- Smoke test namespace ----
+
+namespace :smoke do
+  desc "基本的なAPIスモークテストを実行"
+  task :run do
+    banner "Smoke Tests"
+    errors = []
+
+    puts "Testing /health endpoints..."
+    SERVICES.each do |name, cfg|
+      r = http_get_json(cfg[:url])
+      if r[:status] == 200
+        puts colorize("  #{name} /health: PASS", :green)
+      else
+        msg = "#{name} /health: FAIL (#{r[:error] || r[:status]})"
+        puts colorize("  #{msg}", :red)
+        errors << msg
+      end
+    end
+
+    puts "\nTesting /api/cards..."
+    r = http_get_json("http://localhost:8080/api/cards")
+    if r[:status] == 200 && r.dig(:body).is_a?(Array)
+      count = r[:body].length
+      puts colorize("  GET /api/cards: PASS (#{count} cards)", :green)
+    else
+      msg = "GET /api/cards: FAIL (#{r[:error] || r[:status]})"
+      puts colorize("  #{msg}", :red)
+      errors << msg
+    end
+
+    puts "\nTesting /api/shuffle..."
+    uri    = URI("http://localhost:8080/api/shuffle")
+    req    = Net::HTTP::Post.new(uri, "Content-Type" => "application/json")
+    req.body = [1, 2, 3, 4, 5].to_json
+    begin
+      res = Net::HTTP.start(uri.host, uri.port, open_timeout: HEALTH_TIMEOUT_SEC) { |h| h.request(req) }
+      shuffled = JSON.parse(res.body)
+      if res.code.to_i == 200 && shuffled.sort == [1, 2, 3, 4, 5]
+        puts colorize("  POST /api/shuffle: PASS", :green)
+      else
+        msg = "POST /api/shuffle: FAIL - unexpected response"
+        puts colorize("  #{msg}", :red)
+        errors << msg
+      end
+    rescue => e
+      msg = "POST /api/shuffle: ERROR - #{e.message}"
+      puts colorize("  #{msg}", :red)
+      errors << msg
+    end
+
+    puts "\n" + "=" * 50
+    if errors.empty?
+      puts colorize("All smoke tests passed!", :green)
+    else
+      puts colorize("#{errors.size} test(s) failed:", :red)
+      errors.each { |e| puts "  - #{e}" }
+      exit 1
+    end
+  end
+
+  desc "WebSocketの接続テスト"
+  task :websocket do
+    banner "WebSocket Smoke Test"
+    puts "Testing realtime service on ws://localhost:4000 ..."
+    puts "  Note: Full WebSocket test requires wscat or similar tool."
+    puts "  Basic TCP connectivity check..."
+    begin
+      require "socket"
+      TCPSocket.open("localhost", 4000) { puts colorize("  Port 4000: reachable", :green) }
+    rescue => e
+      puts colorize("  Port 4000: unreachable (#{e.message})", :red)
+      exit 1
+    end
+  end
+end
+
+# ---- Default task ----
+
+task default: "health:check"
