@@ -1,0 +1,17 @@
+cabal-version: 2.4
+name:          shuffle
+version:       0.1.0.0
+executable shuffle
+  main-is:          Main.hs
+  hs-source-dirs:   src
+  default-language: Haskell2010
+  build-depends:
+      base       >= 4.14 && < 5
+    , aeson      >= 2.0
+    , bytestring >= 0.11
+    , random     >= 1.2
+    , vector     >= 0.13
+    , wai        >= 3.2
+    , warp       >= 3.3
+    , http-types >= 0.12
+  ghc-options: -O2 -Wall
