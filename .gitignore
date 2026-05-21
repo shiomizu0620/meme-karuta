@@ -1,0 +1,23 @@
+# 著作権のある画像は除外
+services/frontend/public/images/
+
+# 依存関係
+node_modules/
+target/
+_build/
+.stack-work/
+__pycache__/
+
+# ビルド成果物
+dist/
+build/
+*.o
+*.exe
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
