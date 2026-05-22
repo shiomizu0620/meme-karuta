@@ -5,59 +5,17 @@ import { GameBoard } from "./components/GameBoard";
 import { ScoreBoard } from "./components/ScoreBoard";
 
 export default function App() {
-  const {
-    phase,
-    room,
-    errorMsg,
-    createRoom,
-    joinRoom,
-    leaveRoom,
-    startGame,
-    nextCard,
-    takeCard,
-    resetError,
-  } = useGame();
+  const g = useGame();
+  const handleEnter = (r: LobbyResult) => r.mode === "create" ? g.createRoom(r.playerName) : g.joinRoom(r.playerName, r.roomId);
 
-  const handleEnter = (result: LobbyResult) => {
-    if (result.mode === "create") {
-      createRoom(result.playerName);
-    } else {
-      joinRoom(result.playerName, result.roomId);
-    }
-  };
-
-  if (phase === "waiting" && room) {
-    return (
-      <WaitingRoom
-        roomId={room.roomId}
-        players={room.players}
-        isHost={room.isHost}
-        playerName={room.playerName}
-        onLeave={leaveRoom}
-        onStartGame={startGame}
-      />
-    );
+  if (g.phase === "waiting" && g.room) {
+    return <WaitingRoom roomId={g.room.roomId} players={g.room.players} isHost={g.room.isHost} playerName={g.room.playerName} onLeave={g.leaveRoom} onStartGame={g.startGame} />;
   }
-
-  if (phase === "playing" && room) {
-    return (
-      <GameBoard
-        room={room}
-        onTakeCard={takeCard}
-        onNextCard={nextCard}
-      />
-    );
+  if (g.phase === "playing" && g.room) {
+    return <GameBoard room={g.room} onTakeCard={g.takeCard} onNextCard={g.nextCard} />;
   }
-
-  if (phase === "finished" && room) {
-    return <ScoreBoard room={room} onPlayAgain={leaveRoom} />;
+  if (g.phase === "finished" && g.room) {
+    return <ScoreBoard room={g.room} onPlayAgain={g.leaveRoom} />;
   }
-
-  return (
-    <RoomLobby
-      onEnter={handleEnter}
-      loading={phase === "connecting"}
-      serverError={phase === "error" ? (errorMsg ?? "エラーが発生しました") : null}
-    />
-  );
+  return <RoomLobby onEnter={handleEnter} loading={g.phase === "connecting"} serverError={g.phase === "error" ? (g.errorMsg ?? "エラーが発生しました") : null} />;
 }

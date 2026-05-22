@@ -380,15 +380,83 @@ static void http_response(int fd, int status, const char *body, size_t body_len)
     send_all(fd, body, body_len);
 }
 
+/* リクエストボディサイズの上限。これを超えるリクエストは拒否する。 */
+#define MAX_REQUEST_BODY 32768
+
+/* リクエスト中の Content-Length を解析する。見つからなければ -1。 */
+static long parse_content_length(const char *req) {
+    const char *p = strstr(req, "Content-Length:");
+    if (!p) p = strstr(req, "content-length:");
+    if (!p) return -1;
+    p = strchr(p, ':');
+    if (!p) return -1;
+    return strtol(p + 1, NULL, 10);
+}
+
+/* バイナリパケットの妥当性を事前検証してエラー詳細を返す。 */
+static int validate_packet_buffer(const uint8_t *buf, size_t len,
+                                  char *detail, size_t detail_size) {
+    if (!buf || len < sizeof(CardPacketHeader) + sizeof(uint32_t)) {
+        snprintf(detail, detail_size,
+            "buffer too small: %zu bytes (need at least %zu)",
+            len, sizeof(CardPacketHeader) + sizeof(uint32_t));
+        return SER_ERR_TRUNCATED;
+    }
+    uint32_t magic =  (uint32_t)buf[0]
+                  | ((uint32_t)buf[1] << 8)
+                  | ((uint32_t)buf[2] << 16)
+                  | ((uint32_t)buf[3] << 24);
+    if (magic != MAGIC_NUMBER) {
+        snprintf(detail, detail_size,
+            "magic mismatch: got 0x%08x, expected 0x%08x", magic, MAGIC_NUMBER);
+        return SER_ERR_MAGIC;
+    }
+    if (buf[4] != FORMAT_VERSION) {
+        snprintf(detail, detail_size,
+            "version mismatch: got %u, expected %u", buf[4], FORMAT_VERSION);
+        return SER_ERR_VERSION;
+    }
+    snprintf(detail, detail_size, "header OK");
+    return SER_OK;
+}
+
 static void handle_connection(int client_fd, const Card *cards, uint32_t count) {
     char req_buf[2048] = {0};
     ssize_t n = recv(client_fd, req_buf, sizeof(req_buf) - 1, 0);
     if (n <= 0) goto done;
     req_buf[n] = '\0';
 
+    /* リクエストボディサイズの早期拒否 */
+    long content_len = parse_content_length(req_buf);
+    if (content_len > MAX_REQUEST_BODY) {
+        char body[128];
+        snprintf(body, sizeof(body),
+            "{\"error\":\"request body too large\",\"limit\":%d}", MAX_REQUEST_BODY);
+        http_response(client_fd, 413, body, strlen(body));
+        goto done;
+    }
+
     if (strncmp(req_buf, "GET /health", 11) == 0) {
         const char *body = "{\"status\":\"ok\"}";
         http_response(client_fd, 200, body, strlen(body));
+    } else if (strncmp(req_buf, "POST /serial/validate", 21) == 0) {
+        const char *body_start = strstr(req_buf, "\r\n\r\n");
+        if (!body_start) {
+            const char *err = "{\"error\":\"missing body\"}";
+            http_response(client_fd, 400, err, strlen(err));
+        } else {
+            body_start += 4;
+            size_t avail = (size_t)(n - (body_start - req_buf));
+            char detail[160];
+            int code = validate_packet_buffer((const uint8_t *)body_start, avail,
+                                              detail, sizeof(detail));
+            char body[256];
+            snprintf(body, sizeof(body),
+                "{\"code\":%d,\"ok\":%s,\"detail\":\"%s\",\"strerror\":\"%s\"}",
+                code, (code == SER_OK) ? "true" : "false",
+                detail, ser_strerror(code));
+            http_response(client_fd, (code == SER_OK) ? 200 : 400, body, strlen(body));
+        }
     } else if (strncmp(req_buf, "GET /serial/cards", 17) == 0) {
         char json[MAX_PAYLOAD_SIZE];
         int r = cards_to_json_array(cards, count, json, sizeof(json));

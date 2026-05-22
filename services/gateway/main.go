@@ -264,7 +264,8 @@ func loggingMiddleware(metrics *Metrics, next http.Handler) http.Handler {
 		rw := &responseWriter{ResponseWriter: w, status: http.StatusOK}
 		next.ServeHTTP(rw, r)
 		dur := time.Since(start)
-		log.Printf("%s %s %d %s", r.Method, r.URL.Path, rw.status, dur.Round(time.Millisecond))
+		rid := requestIDFromContext(r.Context())
+		log.Printf("[%s] %s %s %d %s ip=%s", rid, r.Method, r.URL.Path, rw.status, dur.Round(time.Millisecond), clientIP(r))
 		if rw.status >= 500 {
 			metrics.totalErrors.Add(1)
 		}
@@ -321,6 +322,101 @@ func clientIP(r *http.Request) string {
 		return addr[:idx]
 	}
 	return addr
+}
+
+// ---- リクエストID / トレース ----
+
+type ctxKey int
+
+const requestIDKey ctxKey = 1
+
+func generateRequestID() string {
+	const charset = "abcdefghijklmnopqrstuvwxyz0123456789"
+	b := make([]byte, 16)
+	now := time.Now().UnixNano()
+	for i := range b {
+		b[i] = charset[int(now>>uint(i*3))%len(charset)]
+	}
+	return string(b)
+}
+
+func requestIDMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		rid := r.Header.Get("X-Request-ID")
+		if rid == "" {
+			rid = generateRequestID()
+		}
+		w.Header().Set("X-Request-ID", rid)
+		ctx := context.WithValue(r.Context(), requestIDKey, rid)
+		r.Header.Set("X-Request-ID", rid)
+		next.ServeHTTP(w, r.WithContext(ctx))
+	})
+}
+
+func requestIDFromContext(ctx context.Context) string {
+	if v, ok := ctx.Value(requestIDKey).(string); ok {
+		return v
+	}
+	return "-"
+}
+
+// ---- サーキットブレーカー ----
+
+type CircuitBreaker struct {
+	mu          sync.Mutex
+	failures    map[string]int
+	openedAt    map[string]time.Time
+	threshold   int
+	openTimeout time.Duration
+}
+
+func newCircuitBreaker(threshold int, openTimeout time.Duration) *CircuitBreaker {
+	return &CircuitBreaker{
+		failures:    make(map[string]int),
+		openedAt:    make(map[string]time.Time),
+		threshold:   threshold,
+		openTimeout: openTimeout,
+	}
+}
+
+func (cb *CircuitBreaker) Allow(upstream string) bool {
+	cb.mu.Lock()
+	defer cb.mu.Unlock()
+	if openedAt, open := cb.openedAt[upstream]; open {
+		if time.Since(openedAt) < cb.openTimeout {
+			return false
+		}
+		delete(cb.openedAt, upstream)
+		cb.failures[upstream] = 0
+	}
+	return true
+}
+
+func (cb *CircuitBreaker) RecordSuccess(upstream string) {
+	cb.mu.Lock()
+	defer cb.mu.Unlock()
+	cb.failures[upstream] = 0
+}
+
+func (cb *CircuitBreaker) RecordFailure(upstream string) {
+	cb.mu.Lock()
+	defer cb.mu.Unlock()
+	cb.failures[upstream]++
+	if cb.failures[upstream] >= cb.threshold {
+		cb.openedAt[upstream] = time.Now()
+	}
+}
+
+func (cb *CircuitBreaker) State(upstream string) string {
+	cb.mu.Lock()
+	defer cb.mu.Unlock()
+	if openedAt, open := cb.openedAt[upstream]; open && time.Since(openedAt) < cb.openTimeout {
+		return "open"
+	}
+	if cb.failures[upstream] > 0 {
+		return "half-open"
+	}
+	return "closed"
 }
 
 // ---- ルーター構築 ----
@@ -393,9 +489,10 @@ func main() {
 	mux := buildMux(cfg, metrics, healthChecker)
 
 	handler := recoveryMiddleware(
-		loggingMiddleware(metrics,
-			rateLimitMiddleware(rl, metrics,
-				corsMiddleware(mux))))
+		requestIDMiddleware(
+			loggingMiddleware(metrics,
+				rateLimitMiddleware(rl, metrics,
+					corsMiddleware(mux)))))
 
 	srv := &http.Server{
 		Addr:         cfg.ListenAddr,

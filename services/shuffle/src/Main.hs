@@ -164,11 +164,27 @@ handleRequest req =
     (m, "/stats") | m == methodPost ->
       handleStats req
 
-    (_, "/shuffle")         -> return $ errorResponse status405 "POST required"
-    (_, "/shuffle/sattolo") -> return $ errorResponse status405 "POST required"
-    (_, "/shuffle/seed")    -> return $ errorResponse status405 "POST required"
-    (_, "/stats")           -> return $ errorResponse status405 "POST required"
-    _                       -> return $ errorResponse status404 "not found"
+    (m, "/verify") | m == methodPost ->
+      handleVerify req
+
+    (m, "/shuffle/weighted") | m == methodPost ->
+      handleWeighted req
+
+    (m, "/benchmark") | m == methodPost ->
+      handleBenchmark req
+
+    (m, "/shuffle/repeat") | m == methodPost ->
+      handleRepeat req
+
+    (_, "/shuffle")          -> return $ errorResponse status405 "POST required"
+    (_, "/shuffle/sattolo")  -> return $ errorResponse status405 "POST required"
+    (_, "/shuffle/seed")     -> return $ errorResponse status405 "POST required"
+    (_, "/shuffle/weighted") -> return $ errorResponse status405 "POST required"
+    (_, "/shuffle/repeat")   -> return $ errorResponse status405 "POST required"
+    (_, "/stats")            -> return $ errorResponse status405 "POST required"
+    (_, "/verify")           -> return $ errorResponse status405 "POST required"
+    (_, "/benchmark")        -> return $ errorResponse status405 "POST required"
+    _                        -> return $ errorResponse status404 "not found"
 
 -- ---- /shuffle: 標準 Fisher-Yates ----
 
@@ -293,6 +309,202 @@ handleStats req = do
                 , "entropy" .= ssEntropy stats
                 ]
             ])
+
+-- ---- /verify: 順列の妥当性検証 ----
+
+data VerifyRequest = VerifyRequest
+  { vrOriginal :: [Int]
+  , vrShuffled :: [Int]
+  }
+
+instance Data.Aeson.FromJSON VerifyRequest where
+  parseJSON = Data.Aeson.withObject "VerifyRequest" $ \v ->
+    VerifyRequest <$> v Data.Aeson..: "original" <*> v Data.Aeson..: "shuffled"
+
+isValidPermutation :: [Int] -> [Int] -> (Bool, [String])
+isValidPermutation orig shuf =
+  let errors =
+        [ "length mismatch: " ++ show (length orig) ++ " vs " ++ show (length shuf)
+        | length orig /= length shuf
+        ]
+        ++
+        [ "element set differs"
+        | sort orig /= sort shuf
+        ]
+        ++
+        [ "duplicates in shuffled output"
+        | length (nub shuf) /= length shuf
+        ]
+  in (null errors, errors)
+
+handleVerify :: Request -> IO Response
+handleVerify req = do
+  body <- lazyRequestBody req
+  case Data.Aeson.decode body :: Maybe VerifyRequest of
+    Nothing -> return $ errorResponse status400 "expected {\"original\":[...],\"shuffled\":[...]}"
+    Just vr -> do
+      let (ok, errs) = isValidPermutation (vrOriginal vr) (vrShuffled vr)
+          identical = vrOriginal vr == vrShuffled vr
+      return $ jsonResponse status200 (object
+        [ "valid"      .= ok
+        , "identical"  .= identical
+        , "errors"     .= errs
+        , "size"       .= length (vrOriginal vr)
+        ])
+
+-- ---- /shuffle/weighted: 重み付きシャッフル ----
+
+data WeightedRequest = WeightedRequest
+  { wrIds     :: [Int]
+  , wrWeights :: [Double]
+  }
+
+instance Data.Aeson.FromJSON WeightedRequest where
+  parseJSON = Data.Aeson.withObject "WeightedRequest" $ \v ->
+    WeightedRequest <$> v Data.Aeson..: "ids" <*> v Data.Aeson..: "weights"
+
+weightedSample :: [Int] -> [Double] -> IO [Int]
+weightedSample ids ws = go (zip ids ws)
+  where
+    go []   = return []
+    go pool = do
+      let total = sum (map snd pool)
+      if total <= 0 then return (map fst pool)
+      else do
+        r <- randomRIO (0, total)
+        let (picked, rest) = pickByWeight r pool
+        more <- go rest
+        return (picked : more)
+
+    pickByWeight :: Double -> [(Int, Double)] -> (Int, [(Int, Double)])
+    pickByWeight _ [] = error "empty pool"
+    pickByWeight r ((x, w):xs)
+      | r <= w    = (x, xs)
+      | otherwise = let (y, ys) = pickByWeight (r - w) xs in (y, (x, w) : ys)
+
+handleWeighted :: Request -> IO Response
+handleWeighted req = do
+  body <- lazyRequestBody req
+  case Data.Aeson.decode body :: Maybe WeightedRequest of
+    Nothing -> return $ errorResponse status400 "expected {\"ids\":[...],\"weights\":[...]}"
+    Just wr
+      | length (wrIds wr) /= length (wrWeights wr) ->
+          return $ errorResponse status400 "ids and weights length mismatch"
+      | any (< 0) (wrWeights wr) ->
+          return $ errorResponse status400 "weights must be non-negative"
+      | length (wrIds wr) > maxShuffleSize ->
+          return $ errorResponse status400
+            ("too many items: max " ++ show maxShuffleSize)
+      | null (wrIds wr) ->
+          return $ errorResponse status400 "empty ids"
+      | otherwise -> do
+          picked <- weightedSample (wrIds wr) (wrWeights wr)
+          return $ jsonResponse status200 (object
+            [ "ids"       .= picked
+            , "algorithm" .= ("weighted-sample" :: String)
+            ])
+
+-- ---- /benchmark: 複数試行のエントロピー分散 ----
+
+data BenchmarkRequest = BenchmarkRequest
+  { brIds        :: [Int]
+  , brIterations :: Int
+  }
+
+instance Data.Aeson.FromJSON BenchmarkRequest where
+  parseJSON = Data.Aeson.withObject "BenchmarkRequest" $ \v ->
+    BenchmarkRequest <$> v Data.Aeson..: "ids" <*> v Data.Aeson..: "iterations"
+
+handleBenchmark :: Request -> IO Response
+handleBenchmark req = do
+  body <- lazyRequestBody req
+  case Data.Aeson.decode body :: Maybe BenchmarkRequest of
+    Nothing -> return $ errorResponse status400
+      "expected {\"ids\":[...],\"iterations\":N}"
+    Just br
+      | brIterations br < 1 || brIterations br > 1000 ->
+          return $ errorResponse status400 "iterations must be in [1,1000]"
+      | otherwise -> case validateInput (brIds br) of
+          Left EmptyInput -> return $ errorResponse status400 "empty ids"
+          Left (TooManyItems n mx) -> return $ errorResponse status400
+            ("too many items: " ++ show n ++ " (max " ++ show mx ++ ")")
+          Left (InvalidInput msg) -> return $ errorResponse status400 msg
+          Right vec -> do
+            entropies <- replicateM (brIterations br) $ do
+              shuffled <- fisherYates vec
+              return (ssEntropy (computeStats shuffled))
+            let n      = length entropies
+                avg    = sum entropies / fromIntegral n
+                vari   = sum (map (\e -> (e - avg) ** 2) entropies) / fromIntegral n
+                stdDev = sqrt vari
+                mnE    = minimum entropies
+                mxE    = maximum entropies
+            return $ jsonResponse status200 (object
+              [ "iterations" .= n
+              , "size"       .= V.length vec
+              , "mean"       .= avg
+              , "stddev"     .= stdDev
+              , "min"        .= mnE
+              , "max"        .= mxE
+              ])
+
+-- ---- /shuffle/repeat: 同じ入力に対し N 回シャッフルを返す ----
+
+handleRepeat :: Request -> IO Response
+handleRepeat req = do
+  body <- lazyRequestBody req
+  case Data.Aeson.decode body :: Maybe ShuffleNRequest of
+    Nothing -> return $ errorResponse status400 "expected {\"ids\":[...],\"n\":N}"
+    Just sr
+      | snN sr < 1 || snN sr > 100 ->
+          return $ errorResponse status400 "n must be in [1,100]"
+      | otherwise -> case validateInput (snIds sr) of
+          Left EmptyInput -> return $ errorResponse status400 "empty ids"
+          Left (TooManyItems n mx) -> return $ errorResponse status400
+            ("too many items: " ++ show n ++ " (max " ++ show mx ++ ")")
+          Left (InvalidInput msg) -> return $ errorResponse status400 msg
+          Right vec -> do
+            runs <- replicateM (snN sr) (V.toList <$> fisherYates vec)
+            let collisions = computeCollisions runs
+            return $ jsonResponse status200 (object
+              [ "runs"       .= runs
+              , "iterations" .= snN sr
+              , "collisions" .= collisions
+              ])
+
+computeCollisions :: [[Int]] -> Int
+computeCollisions runs =
+  let pairs = [ (a, b) | (a:rest) <- tails' runs, b <- rest ]
+  in length (filter (uncurry (==)) pairs)
+
+tails' :: [a] -> [[a]]
+tails' []     = []
+tails' (x:xs) = (x:xs) : tails' xs
+
+-- ---- 追加ヘルパー: 入力サイズ事前チェック ----
+
+isValidShuffleInput :: [Int] -> Either String Int
+isValidShuffleInput xs
+  | null xs                        = Left "input must not be empty"
+  | length xs > maxShuffleSize     = Left ("input too large: " ++ show (length xs))
+  | length (nub xs) /= length xs   = Left "input contains duplicates"
+  | any (< 0) xs                   = Left "input contains negative ids"
+  | otherwise                      = Right (length xs)
+
+-- ---- 追加ヘルパー: シャッフル結果の独立性チェック ----
+
+countFixedPoints :: [Int] -> [Int] -> Int
+countFixedPoints orig shuf
+  | length orig /= length shuf = -1
+  | otherwise = length (filter id (zipWith (==) orig shuf))
+
+-- 同じ位置のままになった要素の比率（理論期待値は 1/n ≒ 0）
+fixedPointRatio :: [Int] -> [Int] -> Double
+fixedPointRatio orig shuf =
+  case countFixedPoints orig shuf of
+    -1 -> -1.0
+    n  -> if null orig then 0.0
+                       else fromIntegral n / fromIntegral (length orig)
 
 -- ---- メイン ----
 

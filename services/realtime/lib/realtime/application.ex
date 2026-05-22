@@ -6,14 +6,7 @@ defmodule Realtime.Application do
   def start(_type, _args) do
     port = Application.get_env(:realtime, :port, 4000)
 
-    routes = [
-      {:_, [
-        {"/ws", Realtime.SocketHandler, []},
-        {"/health", Realtime.HttpHandler, []},
-        {"/rooms/count", Realtime.HttpHandler, []},
-        {:_, Realtime.HttpHandler, []}
-      ]}
-    ]
+    routes = [{:_, [{"/ws", Realtime.SocketHandler, []}]}]
     dispatch = :cowboy_router.compile(routes)
 
     {:ok, _} =
