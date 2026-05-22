@@ -122,7 +122,12 @@ defmodule Realtime.SocketHandler do
 
   defp fetch_cards do
     case :httpc.request(:get, {String.to_charlist(card_gen_url() <> "/cards"), []}, [], body_format: :string) do
-      {:ok, {{_, 200, _}, _, body}} -> {:ok, Jason.decode!(body)}
+      {:ok, {{_, 200, _}, _, body}} ->
+        case Jason.decode(body) do
+          {:ok, %{"cards" => cards}} when is_list(cards) -> {:ok, cards}
+          {:ok, cards} when is_list(cards) -> {:ok, cards}
+          _ -> {:error, "カードデータの形式が不正です"}
+        end
       _ -> {:error, "カードの取得に失敗しました"}
     end
   end
