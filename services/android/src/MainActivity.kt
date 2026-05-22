@@ -50,57 +50,33 @@ class MainActivity : AppCompatActivity() {
             setSupportZoom(false)
             builtInZoomControls = false
         }
-
         webView.webChromeClient = WebChromeClient()
-
         webView.webViewClient = object : WebViewClient() {
             override fun onReceivedError(view: WebView, request: WebResourceRequest, error: WebResourceError) {
                 super.onReceivedError(view, request, error)
-                val code = error.errorCode
-                val desc = error.description
-                mainHandler.post {
-                    showErrorDialog("ページの読み込みに失敗しました\n(${code}: ${desc})")
-                }
+                mainHandler.post { showErrorDialog("ページの読み込みに失敗しました\n(${error.errorCode}: ${error.description})") }
             }
-
             override fun onPageFinished(view: WebView, url: String) {
                 super.onPageFinished(view, url)
                 injectNativeBridge()
             }
         }
-
         webView.addJavascriptInterface(NativeBridge(), "AndroidBridge")
     }
 
     private fun setupWebSocket() {
-        val realtimeUrl = getRealtimeUrl()
-        wsClient = GameWebSocketClient(realtimeUrl, object : GameWebSocketClient.Listener {
-            override fun onOpen() {
-                mainHandler.post { notifyWebView("wsOpen", "{}") }
-            }
-
+        wsClient = GameWebSocketClient(getRealtimeUrl(), object : GameWebSocketClient.Listener {
+            override fun onOpen() { mainHandler.post { notifyWebView("wsOpen", "{}") } }
             override fun onMessage(json: String) {
-                mainHandler.post {
-                    notifyWebView("wsMessage", json)
-                    handleServerMessage(json)
-                }
+                mainHandler.post { notifyWebView("wsMessage", json); handleServerMessage(json) }
             }
-
             override fun onClose(code: Int, reason: String) {
-                mainHandler.post {
-                    val payload = JSONObject().apply {
-                        put("code", code)
-                        put("reason", reason)
-                    }.toString()
-                    notifyWebView("wsClose", payload)
-                }
+                val payload = JSONObject().apply { put("code", code); put("reason", reason) }.toString()
+                mainHandler.post { notifyWebView("wsClose", payload) }
             }
-
             override fun onError(message: String) {
-                mainHandler.post {
-                    val payload = JSONObject().apply { put("message", message) }.toString()
-                    notifyWebView("wsError", payload)
-                }
+                val payload = JSONObject().apply { put("message", message) }.toString()
+                mainHandler.post { notifyWebView("wsError", payload) }
             }
         })
     }
@@ -142,28 +118,22 @@ class MainActivity : AppCompatActivity() {
             when (obj.getString("type")) {
                 "game_started" -> {
                     gameState.status = GameState.Status.PLAYING
-                    gameState.players = parseStringArray(obj.getJSONArray("players"))
+                    val arr = obj.getJSONArray("players")
+                    gameState.players = (0 until arr.length()).map { arr.getString(it) }
                 }
                 "game_over" -> {
                     gameState.status = GameState.Status.FINISHED
-                    val scoresObj = obj.getJSONObject("scores")
-                    gameState.scores = scoresObj.keys().asSequence()
-                        .associateWith { scoresObj.getInt(it) }
+                    val s = obj.getJSONObject("scores")
+                    gameState.scores = s.keys().asSequence().associateWith { s.getInt(it) }
                 }
                 "room_created", "room_joined" -> {
                     gameState.roomId = obj.optString("room_id")
                     gameState.status = GameState.Status.WAITING
                 }
-                "card_taken" -> {
-                    val cardId = obj.getInt("card_id")
-                    gameState.takenCardIds.add(cardId)
-                }
+                "card_taken" -> gameState.takenCardIds.add(obj.getInt("card_id"))
             }
         }
     }
-
-    private fun parseStringArray(arr: org.json.JSONArray): List<String> =
-        (0 until arr.length()).map { arr.getString(it) }
 
     private fun showErrorDialog(message: String) {
         AlertDialog.Builder(this)
@@ -263,44 +233,28 @@ class MainActivity : AppCompatActivity() {
 }
 
 class SettingsActivity : AppCompatActivity() {
-
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-
         val prefs = getSharedPreferences("karuta_prefs", Context.MODE_PRIVATE)
-
-        val frontendUrl = prefs.getString("frontend_url", "http://10.0.2.2:5173") ?: ""
-        val realtimeUrl = prefs.getString("realtime_url", "ws://10.0.2.2:4000/ws") ?: ""
-
+        val frontendInput = android.widget.EditText(this).apply { setText(prefs.getString("frontend_url", "http://10.0.2.2:5173")) }
+        val realtimeInput = android.widget.EditText(this).apply { setText(prefs.getString("realtime_url", "ws://10.0.2.2:4000/ws")) }
         val layout = android.widget.LinearLayout(this).apply {
             orientation = android.widget.LinearLayout.VERTICAL
             setPadding(48, 48, 48, 48)
-        }
-
-        val frontendLabel = android.widget.TextView(this).apply { text = "フロントエンドURL" }
-        val frontendInput = android.widget.EditText(this).apply { setText(frontendUrl) }
-
-        val realtimeLabel = android.widget.TextView(this).apply { text = "リアルタイムサーバーURL (ws://)" }
-        val realtimeInput = android.widget.EditText(this).apply { setText(realtimeUrl) }
-
-        val saveButton = android.widget.Button(this).apply {
-            text = "保存"
-            setOnClickListener {
-                prefs.edit().apply {
-                    putString("frontend_url", frontendInput.text.toString().trim())
-                    putString("realtime_url", realtimeInput.text.toString().trim())
-                    apply()
+            addView(android.widget.TextView(this@SettingsActivity).apply { text = "フロントエンドURL" })
+            addView(frontendInput)
+            addView(android.widget.TextView(this@SettingsActivity).apply { text = "リアルタイムサーバーURL (ws://)" })
+            addView(realtimeInput)
+            addView(android.widget.Button(this@SettingsActivity).apply {
+                text = "保存"
+                setOnClickListener {
+                    prefs.edit().putString("frontend_url", frontendInput.text.toString().trim())
+                        .putString("realtime_url", realtimeInput.text.toString().trim()).apply()
+                    Toast.makeText(applicationContext, "保存しました", Toast.LENGTH_SHORT).show()
+                    finish()
                 }
-                Toast.makeText(applicationContext, "保存しました", Toast.LENGTH_SHORT).show()
-                finish()
-            }
+            })
         }
-
-        layout.addView(frontendLabel)
-        layout.addView(frontendInput)
-        layout.addView(realtimeLabel)
-        layout.addView(realtimeInput)
-        layout.addView(saveButton)
         setContentView(layout)
         title = "接続設定"
     }

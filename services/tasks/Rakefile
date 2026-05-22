@@ -357,6 +357,149 @@ namespace :smoke do
   end
 end
 
+# ---- Validation namespace: 事前バリデーション ----
+
+namespace :validate do
+  desc "docker-compose.yml の存在と基本構文を検証"
+  task :compose do
+    banner "Validating docker-compose.yml"
+    unless File.exist?(COMPOSE_FILE)
+      puts colorize("ERROR: docker-compose.yml not found at #{COMPOSE_FILE}", :red)
+      exit 1
+    end
+    out = run_cmd("docker compose -f #{COMPOSE_FILE} config --quiet")
+    if out.nil? || out.empty?
+      puts colorize("compose file OK", :green)
+    else
+      puts out
+    end
+  end
+
+  desc "全サービスに必要な環境変数の存在を検証"
+  task :env do
+    banner "Validating environment variables"
+    required = %w[VITE_GATEWAY_URL VITE_REALTIME_URL]
+    missing = required.reject { |k| ENV.key?(k) }
+    if missing.empty?
+      puts colorize("All required env vars set", :green)
+    else
+      puts colorize("Missing env vars: #{missing.join(', ')}", :yellow)
+      puts "  (using defaults; set them explicitly for production)"
+    end
+  end
+
+  desc "依存サービス（実行中の Docker daemon）の可用性チェック"
+  task :daemon do
+    banner "Checking Docker daemon"
+    _stdout, _stderr, status = Open3.capture3("docker info")
+    if status.success?
+      puts colorize("Docker daemon reachable", :green)
+    else
+      puts colorize("Docker daemon NOT reachable - is Docker running?", :red)
+      exit 1
+    end
+  end
+
+  desc "デプロイ前の全バリデーション"
+  task all: %i[daemon compose env]
+end
+
+# ---- Canary deployment ----
+
+namespace :canary do
+  desc "1サービスを先行デプロイ → ヘルス確認 → 残りを展開 (rake canary:deploy[gateway])"
+  task :deploy, [:service] do |_, args|
+    canary = args[:service]&.to_sym
+    raise "Usage: rake canary:deploy[SERVICE_NAME]" unless canary && SERVICES.key?(canary)
+
+    banner "Canary deploy: #{canary} first"
+    docker_compose("up -d --no-deps --build #{canary}")
+    puts "Waiting 10s for #{canary} to stabilize..."
+    sleep 10
+
+    result = http_get_json(SERVICES[canary][:url])
+    unless result[:status] == 200
+      puts colorize("Canary FAILED (#{result[:error] || result[:status]}). Aborting rollout.", :red)
+      exit 1
+    end
+    puts colorize("Canary OK. Rolling out remaining services...", :green)
+
+    rest = SERVICES.keys - [canary]
+    rest.each do |svc|
+      puts "  Deploying #{svc}..."
+      docker_compose("up -d --no-deps #{svc}")
+      sleep 3
+      r = http_get_json(SERVICES[svc][:url])
+      if r[:status] != 200
+        puts colorize("  #{svc} FAILED post-deploy: #{r[:error]}", :red)
+      else
+        puts colorize("  #{svc} OK", :green)
+      end
+    end
+    puts colorize("Canary deploy complete.", :green)
+  end
+end
+
+# ---- Backup namespace: ロールバック前の構成バックアップ ----
+
+namespace :backup do
+  BACKUP_DIR = File.expand_path("../../backups", __dir__)
+
+  desc "現在の docker-compose.yml と env をタイムスタンプ付きで保存"
+  task :snapshot do
+    FileUtils.mkdir_p(BACKUP_DIR)
+    ts = Time.now.strftime("%Y%m%d_%H%M%S")
+    snapshot_dir = File.join(BACKUP_DIR, "snapshot_#{ts}")
+    FileUtils.mkdir_p(snapshot_dir)
+    FileUtils.cp(COMPOSE_FILE, File.join(snapshot_dir, "docker-compose.yml")) if File.exist?(COMPOSE_FILE)
+    File.write(File.join(snapshot_dir, "metadata.json"),
+               JSON.pretty_generate({ ts: ts, services: SERVICES.keys, host: `hostname`.strip }))
+    puts colorize("Snapshot saved -> #{snapshot_dir}", :green)
+  end
+
+  desc "保存済みスナップショット一覧"
+  task :list do
+    return puts "No backup directory yet." unless Dir.exist?(BACKUP_DIR)
+    snapshots = Dir.children(BACKUP_DIR).select { |c| c.start_with?("snapshot_") }.sort
+    if snapshots.empty?
+      puts "No snapshots."
+    else
+      snapshots.each { |s| puts "  - #{s}" }
+    end
+  end
+end
+
+# ---- Notification namespace: デプロイ通知（ログのみ実装、外部連携は将来） ----
+
+namespace :notify do
+  NOTIFY_LOG = File.expand_path("../../logs/notifications.log", __dir__)
+
+  def notify(level, message)
+    FileUtils.mkdir_p(File.dirname(NOTIFY_LOG))
+    File.open(NOTIFY_LOG, "a") { |f| f.puts "[#{Time.now.utc.iso8601}] #{level.to_s.upcase}: #{message}" }
+    case level
+    when :info  then puts colorize("[NOTIFY] #{message}", :cyan)
+    when :warn  then puts colorize("[NOTIFY] #{message}", :yellow)
+    when :error then puts colorize("[NOTIFY] #{message}", :red)
+    end
+  end
+
+  desc "テスト通知"
+  task :test do
+    notify(:info, "Test notification at #{Time.now}")
+  end
+
+  desc "デプロイ完了通知"
+  task :deployed do
+    failed = check_all_services.select { |_, r| !r[:ok] }
+    if failed.empty?
+      notify(:info, "Deploy completed successfully (#{SERVICES.size} services)")
+    else
+      notify(:error, "Deploy completed but #{failed.size} service(s) unhealthy: #{failed.keys.join(', ')}")
+    end
+  end
+end
+
 # ---- Default task ----
 
 task default: "health:check"

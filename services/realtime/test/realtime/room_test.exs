@@ -66,4 +66,39 @@ defmodule Realtime.RoomTest do
   test "list_players on nonexistent room returns empty list" do
     assert [] = Realtime.Room.list_players("NOSUCHROOM")
   end
+
+  test "player_count returns 0 for nonexistent room" do
+    assert 0 = Realtime.Room.player_count("NOSUCHROOM")
+  end
+
+  test "get_host returns nil for nonexistent room" do
+    assert is_nil(Realtime.Room.get_host("NOSUCHROOM"))
+  end
+
+  test "first joining player becomes host", %{room_id: room_id} do
+    {:ok, _} = Realtime.Room.join(room_id, self(), "Alice")
+    assert "Alice" = Realtime.Room.get_host(room_id)
+    other = spawn(fn -> receive do: (_ -> :ok) end)
+    Realtime.Room.join(room_id, other, "Bob")
+    assert "Alice" = Realtime.Room.get_host(room_id)
+  end
+
+  test "player_count is updated as players join", %{room_id: room_id} do
+    assert 0 = Realtime.Room.player_count(room_id)
+    {:ok, _} = Realtime.Room.join(room_id, self(), "Alice")
+    assert 1 = Realtime.Room.player_count(room_id)
+    other = spawn(fn -> receive do: (_ -> :ok) end)
+    Realtime.Room.join(room_id, other, "Bob")
+    assert 2 = Realtime.Room.player_count(room_id)
+  end
+
+  test "get_settings returns nil before game starts", %{room_id: room_id} do
+    {:ok, _} = Realtime.Room.join(room_id, self(), "Alice")
+    assert is_nil(Realtime.Room.get_settings(room_id))
+  end
+
+  test "take_card before game start returns error", %{room_id: room_id} do
+    {:ok, _} = Realtime.Room.join(room_id, self(), "Alice")
+    assert {:error, _} = Realtime.Room.take_card(room_id, 1, "Alice")
+  end
 end

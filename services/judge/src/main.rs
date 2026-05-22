@@ -51,6 +51,79 @@ struct HealthResponse {
     uptime_secs: u64,
 }
 
+// ---- プレイヤー単位レート制限 ----
+
+#[derive(Debug)]
+struct PlayerRateLimiter {
+    last_request: DashMap<String, DateTime<Utc>>,
+    min_interval_ms: i64,
+    request_counts: DashMap<String, u32>,
+    max_per_minute: u32,
+}
+
+impl PlayerRateLimiter {
+    fn new(min_interval_ms: i64, max_per_minute: u32) -> Self {
+        Self {
+            last_request: DashMap::new(),
+            min_interval_ms,
+            request_counts: DashMap::new(),
+            max_per_minute,
+        }
+    }
+
+    fn check(&self, player_id: &str) -> Result<(), &'static str> {
+        let now = Utc::now();
+        if let Some(prev) = self.last_request.get(player_id) {
+            let delta = (now - *prev).num_milliseconds();
+            if delta < self.min_interval_ms {
+                return Err("rate limit: too fast (one judge per 100ms)");
+            }
+        }
+        self.last_request.insert(player_id.to_string(), now);
+
+        let mut count = self.request_counts.entry(player_id.to_string()).or_insert(0);
+        *count += 1;
+        if *count > self.max_per_minute {
+            return Err("rate limit: per-minute cap exceeded");
+        }
+        Ok(())
+    }
+
+    fn reset_minute_counters(&self) {
+        self.request_counts.clear();
+    }
+}
+
+// ---- 冪等性キー ----
+
+#[derive(Debug)]
+struct IdempotencyCache {
+    seen: DashMap<String, DateTime<Utc>>,
+    ttl_secs: i64,
+}
+
+impl IdempotencyCache {
+    fn new(ttl_secs: i64) -> Self {
+        Self { seen: DashMap::new(), ttl_secs }
+    }
+
+    fn check_and_insert(&self, key: &str) -> bool {
+        let now = Utc::now();
+        if let Some(prev) = self.seen.get(key) {
+            if (now - *prev).num_seconds() < self.ttl_secs {
+                return false;
+            }
+        }
+        self.seen.insert(key.to_string(), now);
+        true
+    }
+
+    fn prune(&self) {
+        let cutoff = Utc::now() - Duration::seconds(self.ttl_secs);
+        self.seen.retain(|_, ts| *ts > cutoff);
+    }
+}
+
 // ---- アプリケーション状態 ----
 
 struct AppState {
@@ -403,6 +476,22 @@ mod tests {
             .set_json(judge_body("", 1, "player_a")).to_request();
         let resp = test::call_service(&app, req).await;
         assert_eq!(resp.status(), StatusCode::BAD_REQUEST);
+    }
+
+    #[actix_web::test]
+    async fn test_rate_limiter_blocks_rapid_requests() {
+        let rl = PlayerRateLimiter::new(100, 100);
+        assert!(rl.check("p1").is_ok());
+        let err = rl.check("p1");
+        assert!(err.is_err(), "second immediate request should be rate limited");
+    }
+
+    #[actix_web::test]
+    async fn test_idempotency_cache_detects_duplicates() {
+        let cache = IdempotencyCache::new(60);
+        assert!(cache.check_and_insert("req-1"));
+        assert!(!cache.check_and_insert("req-1"), "duplicate key should be rejected");
+        assert!(cache.check_and_insert("req-2"));
     }
 
     #[actix_web::test]

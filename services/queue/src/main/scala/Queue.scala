@@ -58,8 +58,8 @@ class EventQueueService(storage: EventStorage, analytics: AnalyticsEngine) {
 
   private def logEvent(event: GameEvent): Unit = {
     val ts   = event.timestamp.toString.take(23)
-    val typ  = EventSerializer.eventTypeName(event).padEnd(16)
-    val room = event.roomId.padEnd(8)
+    val typ  = EventSerializer.eventTypeName(event).padTo(16, ' ')
+    val room = event.roomId.padTo(8, ' ')
     println(s"[Queue] $ts  $typ  room=$room  id=${event.eventId}")
   }
 }
@@ -293,6 +293,79 @@ class QueueHttpServer(
     }
     pairs.mkString("{", ",", "}")
   }
+}
+
+// ---- Dead-letter queue: 処理失敗イベントの保持 ----
+
+class DeadLetterQueue(maxSize: Int = 1000) {
+  private val items = new ConcurrentLinkedDeque[(GameEvent, String, Instant)]()
+
+  def record(event: GameEvent, reason: String): Unit = {
+    items.addLast((event, reason, Instant.now()))
+    while (items.size() > maxSize) items.pollFirst()
+  }
+
+  def all: Seq[(GameEvent, String, Instant)] =
+    items.toArray(Array.empty[(GameEvent, String, Instant)]).toSeq
+
+  def size: Int = items.size()
+
+  def clear(): Unit = items.clear()
+
+  def reasons: Map[String, Int] =
+    all.groupMapReduce(_._2)(_ => 1)(_ + _)
+}
+
+// ---- イベントバリデーション ----
+
+object EventValidator {
+  private val RoomIdPattern   = "^[A-Z0-9]{4,16}$".r
+  private val EventTypeMax    = 32
+  private val PlayerNameMax   = 32
+
+  def validate(event: GameEvent): Either[String, GameEvent] = {
+    if (event.roomId == null || event.roomId.isEmpty) Left("room_id is empty")
+    else if (!RoomIdPattern.matches(event.roomId)) Left(s"invalid room_id format: ${event.roomId}")
+    else if (event.eventId == null || event.eventId.isEmpty) Left("event_id is empty")
+    else event match {
+      case e: PlayerJoined if e.playerName.length > PlayerNameMax =>
+        Left(s"player_name too long: ${e.playerName.length}")
+      case e: GameStarted if e.players.isEmpty =>
+        Left("game_started with empty players list")
+      case e: CardTaken if e.responseTimeMs < 0 =>
+        Left("negative response_time_ms")
+      case _ => Right(event)
+    }
+  }
+
+  def validateBatch(events: Seq[GameEvent]): (Seq[GameEvent], Seq[(GameEvent, String)]) = {
+    val (rights, lefts) = events.partitionMap { e =>
+      validate(e) match {
+        case Right(v)  => Left(v)
+        case Left(msg) => Right((e, msg))
+      }
+    }
+    (rights, lefts)
+  }
+}
+
+// ---- 履歴の上限管理 ----
+
+class RoomHistoryLimit(maxEventsPerRoom: Int = 5000) {
+  private val counts = new TrieMap[String, Int]()
+
+  def shouldDrop(roomId: String): Boolean = {
+    val current = counts.getOrElse(roomId, 0)
+    if (current >= maxEventsPerRoom) true
+    else {
+      counts.update(roomId, current + 1)
+      false
+    }
+  }
+
+  def reset(roomId: String): Unit = counts.remove(roomId)
+
+  def snapshot: Map[String, Int] = counts.toMap
 }
 
 // ---- メインエントリポイント ----

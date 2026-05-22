@@ -152,5 +152,236 @@ def export_categories_json(path: str | None = None) -> str:
     return result
 
 
+# ---- 外部ファイルからの読み込み ----
+
+def load_cards_from_file(path: str) -> list[CardDict]:
+    """外部 JSON ファイルからカードリストを読み込む。形式エラーは例外を投げる。"""
+    if not os.path.isfile(path):
+        raise FileNotFoundError(f"cards file not found: {path}")
+    with open(path, "r", encoding="utf-8") as f:
+        data = json.load(f)
+    if not isinstance(data, list):
+        raise ValueError("cards JSON must be a list")
+    for entry in data:
+        if not isinstance(entry, dict):
+            raise ValueError(f"each card must be an object, got: {type(entry).__name__}")
+    return data  # type: ignore[return-value]
+
+
+def merge_cards(base: list[CardDict], extra: list[CardDict]) -> list[CardDict]:
+    """id をキーに既存 base に extra をマージ。extra 側が優先。"""
+    by_id: dict[int, CardDict] = {c["id"]: dict(c) for c in base}  # type: ignore[misc]
+    for c in extra:
+        cid = c.get("id")
+        if isinstance(cid, int) and cid > 0:
+            by_id[cid] = dict(c)  # type: ignore[arg-type]
+    return [by_id[k] for k in sorted(by_id.keys())]
+
+
+# ---- 監査ログ ----
+
+AUDIT_LOG_PATH = os.path.join(os.path.dirname(__file__), "audit.log")
+
+
+def audit_log(action: str, detail: str) -> None:
+    """カードデータへの変更履歴を追記。"""
+    try:
+        from datetime import datetime, timezone
+        ts = datetime.now(timezone.utc).isoformat()
+        with open(AUDIT_LOG_PATH, "a", encoding="utf-8") as f:
+            f.write(f"{ts}\t{action}\t{detail}\n")
+    except OSError:
+        pass
+
+
+# ---- 全文検索スコアリング ----
+
+def score_card(card: CardDict, query: str) -> float:
+    """fuda 一致を 2.0、yomi 一致を 1.0 として重み付け。複数語は AND。"""
+    if not query:
+        return 0.0
+    terms = [t for t in re.split(r"\s+", query.lower()) if t]
+    if not terms:
+        return 0.0
+    fuda_lower = card["fuda"].lower()
+    yomi_lower = card["yomi"].lower()
+    score = 0.0
+    for t in terms:
+        in_fuda = t in fuda_lower
+        in_yomi = t in yomi_lower
+        if not in_fuda and not in_yomi:
+            return 0.0
+        if in_fuda:
+            score += 2.0
+        if in_yomi:
+            score += 1.0
+    return score
+
+
+def ranked_search(cards: list[CardDict], query: str, limit: int = 20) -> list[CardDict]:
+    scored = [(score_card(c, query), c) for c in cards]
+    scored = [(s, c) for s, c in scored if s > 0]
+    scored.sort(key=lambda x: (-x[0], x[1]["id"]))
+    return [c for _, c in scored[:limit]]
+
+
+# ---- HTTP サーバー ----
+
+def build_app(cards: list[CardDict]):
+    from http.server import BaseHTTPRequestHandler
+    from urllib.parse import urlparse, parse_qs
+
+    by_id = cards_by_id(cards)
+
+    class Handler(BaseHTTPRequestHandler):
+        def log_message(self, fmt, *args):
+            return  # quiet
+
+        def _send_json(self, status: int, payload) -> None:
+            body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
+            self.send_response(status)
+            self.send_header("Content-Type", "application/json; charset=utf-8")
+            self.send_header("Access-Control-Allow-Origin", "*")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+
+        def do_GET(self):  # noqa: N802
+            parsed = urlparse(self.path)
+            path = parsed.path
+            qs = parse_qs(parsed.query)
+
+            if path == "/health":
+                self._send_json(200, {"status": "ok", "card_count": len(cards)})
+            elif path == "/cards":
+                cat = (qs.get("category") or [None])[0]
+                result = filter_by_category(cards, cat) if cat else cards
+                self._send_json(200, result)
+            elif path.startswith("/cards/"):
+                try:
+                    cid = int(path.removeprefix("/cards/"))
+                except ValueError:
+                    self._send_json(400, {"error": "invalid id"}); return
+                card = by_id.get(cid)
+                if card is None:
+                    self._send_json(404, {"error": "card not found"}); return
+                self._send_json(200, card)
+            elif path == "/categories":
+                self._send_json(200, {"categories": CATEGORIES, "stats": get_category_stats(cards)})
+            elif path == "/search":
+                q = (qs.get("q") or [""])[0]
+                limit = int((qs.get("limit") or ["20"])[0])
+                limit = max(1, min(limit, 100))
+                self._send_json(200, ranked_search(cards, q, limit=limit))
+            elif path == "/stats":
+                self._send_json(200, {
+                    "total": len(cards),
+                    "by_category": get_category_stats(cards),
+                    "validation_errors": validate_all(cards),
+                })
+            else:
+                self._send_json(404, {"error": "not found"})
+
+    return Handler
+
+
+def run_server(host: str = "0.0.0.0", port: int = 5000) -> None:
+    from http.server import HTTPServer
+    server = HTTPServer((host, port), build_app(CARDS))
+    audit_log("server_start", f"{host}:{port}")
+    print(f"card-gen listening on {host}:{port}")
+    try:
+        server.serve_forever()
+    finally:
+        audit_log("server_stop", f"{host}:{port}")
+
+
+# ---- エントリーポイント ----
+
+def main() -> None:
+    mode = os.environ.get("CARD_GEN_MODE", "generate")
+    if mode == "serve":
+        port = int(os.environ.get("PORT", "5000"))
+        run_server(port=port)
+    else:
+        extra_path = os.environ.get("CARDS_EXTRA_PATH")
+        cards: list[CardDict] = list(CARDS)
+        if extra_path:
+            try:
+                extra = load_cards_from_file(extra_path)
+                cards = merge_cards(cards, extra)
+                audit_log("merge", f"loaded {len(extra)} from {extra_path}")
+            except (FileNotFoundError, ValueError) as e:
+                print(f"[WARN] could not load extra cards: {e}")
+        generate(cards)
+
+
+# ---- ユニットテスト ----
+
+def _self_test() -> None:
+    import unittest
+
+    class CardValidationTests(unittest.TestCase):
+        def test_valid_card_has_no_errors(self):
+            self.assertEqual(validate_card(CARDS[0]), [])
+
+        def test_negative_id_rejected(self):
+            bad = dict(CARDS[0]); bad["id"] = -1
+            errs = validate_card(bad)  # type: ignore[arg-type]
+            self.assertTrue(any("positive integer" in e for e in errs))
+
+        def test_empty_fuda_rejected(self):
+            bad = dict(CARDS[0]); bad["fuda"] = "  "
+            errs = validate_card(bad)  # type: ignore[arg-type]
+            self.assertTrue(any("fuda" in e for e in errs))
+
+        def test_bad_image_path_rejected(self):
+            bad = dict(CARDS[0]); bad["image"] = "no/path.exe"
+            errs = validate_card(bad)  # type: ignore[arg-type]
+            self.assertTrue(any("image path" in e for e in errs))
+
+        def test_validate_all_detects_duplicate_id(self):
+            dup = list(CARDS) + [dict(CARDS[0])]  # type: ignore[list-item]
+            results = validate_all(dup)  # type: ignore[arg-type]
+            self.assertTrue(any("duplicate id" in e for v in results.values() for e in v))
+
+    class SearchTests(unittest.TestCase):
+        def test_search_returns_matching_cards(self):
+            results = search_cards(CARDS, "そう")
+            self.assertGreater(len(results), 0)
+
+        def test_search_is_case_insensitive(self):
+            r1 = search_cards(CARDS, "SOU")
+            r2 = search_cards(CARDS, "sou")
+            self.assertEqual(len(r1), len(r2))
+
+        def test_score_card_higher_for_fuda_match(self):
+            card = CARDS[0]
+            score_fuda = score_card(card, card["fuda"][:3])
+            score_yomi = score_card(card, card["yomi"][:3])
+            self.assertGreater(score_fuda, 0)
+            self.assertGreater(score_yomi, 0)
+
+        def test_ranked_search_respects_limit(self):
+            results = ranked_search(CARDS, "や", limit=3)
+            self.assertLessEqual(len(results), 3)
+
+    class CategoryTests(unittest.TestCase):
+        def test_filter_by_category_returns_only_that_category(self):
+            cat = CARDS[0]["category"]
+            for c in filter_by_category(CARDS, cat):
+                self.assertEqual(c["category"], cat)
+
+        def test_get_category_stats_sums_to_total(self):
+            stats = get_category_stats(CARDS)
+            self.assertEqual(sum(stats.values()), len(CARDS))
+
+    suite = unittest.TestLoader().loadTestsFromModule(__import__(__name__))
+    unittest.TextTestRunner(verbosity=2).run(suite)
+
+
 if __name__ == "__main__":
-    generate()
+    if os.environ.get("CARD_GEN_MODE") == "test":
+        _self_test()
+    else:
+        main()
