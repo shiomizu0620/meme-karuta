@@ -71,7 +71,7 @@ export function useGame() {
       send(pendingRef.current);
       pendingRef.current = null;
     }
-    if (status === "error" && phase === "connecting") {
+    if ((status === "error" || status === "closed") && phase === "connecting") {
       setPhase("error");
       setErrorMsg("サーバーに接続できませんでした");
     }

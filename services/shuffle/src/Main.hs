@@ -1,7 +1,8 @@
+{-# LANGUAGE OverloadedStrings #-}
 module Main (main) where
 
 import Control.Monad (forM_, replicateM, when)
-import Data.Aeson (ToJSON, decode, encode, object, (.=))
+import Data.Aeson (FromJSON, ToJSON, decode, encode, object, parseJSON, withObject, (.=), (.:))
 import Data.List (group, nub, sort)
 import Data.Maybe (fromMaybe)
 import qualified Data.ByteString.Lazy as LBS
@@ -513,7 +514,7 @@ main = do
   portStr <- lookupEnv "PORT"
   let port = fromMaybe 5001 (portStr >>= readMaybe)
   putStrLn $ "shuffle listening on :" ++ show port
-  run port handleRequest
+  run port $ \req respond -> handleRequest req >>= respond
 
 readMaybe :: String -> Maybe Int
 readMaybe s = case reads s of
