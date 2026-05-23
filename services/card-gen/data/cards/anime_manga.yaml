@@ -1,0 +1,161 @@
+set:
+  id: anime_manga
+  name: 漫画・アニメミーム
+  description: 漫画・アニメ由来のネットミーム
+
+cards:
+  - id: 14
+    fuda: お前もう船降りろ
+    yomi: お前、もう船降りろ
+    image: お前もう船降りろ.jpg
+    category: 漫画・アニメ
+
+  - id: 15
+    fuda: 開発者俺だもん
+    yomi: そいつの開発者俺だもん
+    image: そいつの開発者.jpg
+    category: 漫画・アニメ
+
+  - id: 16
+    fuda: 鱗滝
+    yomi: 判断が遅い
+    image: 判断が遅い.jpg
+    category: 漫画・アニメ
+
+  - id: 17
+    fuda: 粉バナナ
+    yomi: 粉バナナ
+    image: 粉バナナ.png
+    category: 漫画・アニメ
+
+  - id: 18
+    fuda: おっとそろそろ
+    yomi: おっとそろそろ時間だ、俺は狂うから消えていいよ
+    image: おっとそろそろ時間.png
+    category: 漫画・アニメ
+
+  - id: 19
+    fuda: 奇行種なのか
+    yomi: 無視だと！？奇行種なのか！？
+    image: 無視だと.jpg
+    category: 漫画・アニメ
+
+  - id: 20
+    fuda: 人の心
+    yomi: ひどいなあ。人の心とか無いんか？
+    image: 人の心.jpg
+    category: 漫画・アニメ
+
+  - id: 21
+    fuda: どちらもありうる
+    yomi: どちらもありうる......そんだけだ
+    image: どちらもありうる.png
+    category: 漫画・アニメ
+
+  - id: 22
+    fuda: やるんだな
+    yomi: やるんだな！？今...!ここで!
+    image: やるんだな.jpeg
+    category: 漫画・アニメ
+
+  - id: 23
+    fuda: それはアリだ
+    yomi: それはアリだ
+    image: それはありだ.jpg
+    category: 漫画・アニメ
+
+  - id: 24
+    fuda: 一番弱い人が
+    yomi: 一番弱い人が一番可能性を持ってるんだよ玄弥
+    image: 一番弱い人が.png
+    category: 漫画・アニメ
+
+  - id: 25
+    fuda: おぼふ
+    yomi: おぼふ
+    image: おぼふ.png
+    category: 漫画・アニメ
+
+  - id: 26
+    fuda: 鬼にならないか？
+    yomi: お前も鬼にならないか？
+    image: お前も鬼にならないか.png
+    category: 漫画・アニメ
+
+  - id: 27
+    fuda: 何が嫌いかより
+    yomi: 何が嫌いかより何が好きかで自分を語れよ
+    image: 何が嫌いかより.png
+    category: 漫画・アニメ
+
+  - id: 28
+    fuda: 会話はマキマに
+    yomi: 会話はマキマに聞かれている
+    image: 会話はマキマに.jpg
+    category: 漫画・アニメ
+
+  - id: 29
+    fuda: 勘のいいガキは
+    yomi: 勘のいいガキは嫌いだよ
+    image: 勘のいいガキは.jpg
+    category: 漫画・アニメ
+
+  - id: 30
+    fuda: 男の人って
+    yomi: 男の人っていつもそうですよね
+    image: 男の人って.png
+    category: 漫画・アニメ
+
+  - id: 31
+    fuda: 諦めたら
+    yomi: 諦めたらそこで試合終了ですよ
+    image: 諦めたら.jpg
+    category: 漫画・アニメ
+
+  - id: 32
+    fuda: 計画通り
+    yomi: 計画通り
+    image: 計画通り.jpg
+    category: 漫画・アニメ
+
+  - id: 33
+    fuda: 毒ガス訓練
+    yomi: えっ！今日は全員カレーライス食っていいのか！！おかわりもいいぞ！！
+    image: 今日はカレーライス.jpg
+    category: 漫画・アニメ
+
+  - id: 34
+    fuda: 21歳
+    yomi: もちろん俺らは抵抗するで。拳で。
+    image: 21歳.jpg
+    category: 漫画・アニメ
+
+  - id: 35
+    fuda: 抱けっ！
+    yomi: 抱けッ！抱けえッ！抱けー！
+    image: 抱け.webp
+    category: 漫画・アニメ
+
+  - id: 36
+    fuda: 霊圧が
+    yomi: チャドの霊圧が......消えた...?
+    image: 消えた.jpg
+    category: 漫画・アニメ
+
+  - id: 37
+    fuda: 錯覚していた？
+    yomi: 一体いつから鏡花水月を使っていないと錯覚していた？
+    image: 錯覚.jpg
+    category: 漫画・アニメ
+
+  - id: 38
+    fuda: だが断る
+    yomi: だが断る
+    image: だが断る.webp
+    category: 漫画・アニメ
+
+  - id: 39
+    fuda: 何故俺は
+    yomi: 何故俺は苛立っている...？
+    image: なぜおれは.jpg
+    category: 漫画・アニメ

@@ -1,65 +1,65 @@
 set:
   id: basic
   name: 基本セット
-  description: 定番のネットミーム10枚
+  description: カテゴリ横断のおすすめ10選
 
 cards:
-  - id: 1
+  - id: 41
     fuda: えっほえっほ
     yomi: えっほえっほ
     image: えっほえっほ.jpg
     category: SNS
 
-  - id: 2
+  - id: 42
     fuda: 東大医学部
     yomi: 頭悪くないか？東大医学部あたまわるい！！
     image: 東大医学部.jpg
-    category: 反応
+    category: SNS
 
-  - id: 3
+  - id: 43
     fuda: 3選
-    yomi: 3選
-    image: 3選.jpg
-    category: 反応
+    yomi: 俺が開発をする理由3選
+    image: 3選.png
+    category: SNS
 
-  - id: 4
-    fuda: は？
-    yomi: 予想の斜め上をいく意味不明な発言をされたとき
-    image: ha.jpg
-    category: 反応
+  - id: 44
+    fuda: お前もう船降りろ
+    yomi: お前、もう船降りろ
+    image: お前もう船降りろ.jpg
+    category: 漫画・アニメ
 
-  - id: 5
-    fuda: わかる
-    yomi: 言語化できなかった感情をズバリ言い当てられたとき
-    image: wakaru.jpg
-    category: 共感
+  - id: 45
+    fuda: 開発者俺だもん
+    yomi: そいつの開発者俺だもん
+    image: そいつの開発者.jpg
+    category: 漫画・アニメ
 
-  - id: 6
-    fuda: 無理
-    yomi: どう頑張っても回避できない状況に追い込まれたとき
-    image: muri.jpg
-    category: 反応
+  - id: 46
+    fuda: 大泉洋
+    yomi: またしても何も知らない大泉洋
+    image: またしても何も知らない.jpg
+    category: SNS
 
-  - id: 7
-    fuda: 天才か
-    yomi: 誰も思いつかなかった発想でサラッと問題を解決したとき
-    image: tensaika.jpg
-    category: 褒め
+  - id: 47
+    fuda: 二郎
+    yomi: (神田神保町店は)レベルの高い合格点を超える二郎オールウェイズ出してくれる
+    image: レベルの高い合格点を.jpg
+    category: SNS
 
-  - id: 8
-    fuda: 草
-    yomi: 笑いをこらえられない状況が突然発生したとき
-    image: kusa.jpg
-    category: 笑い
+  - id: 48
+    fuda: 鱗滝
+    yomi: 判断が遅い
+    image: 判断が遅い.jpg
+    category: 漫画・アニメ
 
-  - id: 9
-    fuda: お前が言うな
-    yomi: 最もその発言をしてはいけない人物がその発言をしたとき
-    image: omaegaiune.jpg
-    category: ツッコミ
+  - id: 49
+    fuda: 粉バナナ
+    yomi: 粉バナナ
+    image: 粉バナナ.png
+    category: 漫画・アニメ
 
-  - id: 10
-    fuda: 知らんがな
-    yomi: 自分には一切関係のない問題を押し付けられたとき
-    image: shirangana.jpg
-    category: ツッコミ
+  - id: 50
+    fuda: 容態急変
+    yomi: 容態急変FULL
+    image: 容態急変FULL.png
+    category: SNS

@@ -1,0 +1,41 @@
+set:
+  id: tv
+  name: テレビミーム
+  description: テレビ番組由来のネットミーム
+
+cards:
+  - id: 8
+    fuda: でも幸せなら
+    yomi: でも幸せならOKです
+    image: でも幸せなら.jpg
+    category: テレビ
+
+  - id: 9
+    fuda: 助けてください
+    yomi: あえて申し上げます。助けてください。
+    image: あえて申し上げます.jpg
+    category: テレビ
+
+  - id: 10
+    fuda: 明日にしよう
+    yomi: あしたにしようあしたにしようってどんどんどんどん先延ばしにしていまして
+    image: あしたにしよう.jpg
+    category: テレビ
+
+  - id: 11
+    fuda: うんち！
+    yomi: うんち！(せいかいのおと)
+    image: 正解のおと.png
+    category: テレビ
+
+  - id: 12
+    fuda: 反省してまーす
+    yomi: チッうるせいな。反省してまーす。
+    image: 反省してます.jpg
+    category: テレビ
+
+  - id: 13
+    fuda: そんなに
+    yomi: そんなに興奮しないでください。お疲れ様でした。
+    image: そんなに興奮しないで.jpg
+    category: テレビ
