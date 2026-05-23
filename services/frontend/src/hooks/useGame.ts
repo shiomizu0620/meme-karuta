@@ -10,6 +10,7 @@ export interface GameSettings {
   yomite_name: string;
   end_mode: "count" | "time";
   end_value: number;
+  selected_sets: string[];
 }
 
 export interface GameState {
@@ -29,10 +30,24 @@ export interface RoomState {
   game: GameState | null;
 }
 
+const GATEWAY_URL =
+  (import.meta as unknown as { env: Record<string, string> }).env
+    .VITE_GATEWAY_URL ?? "http://localhost:8080";
+
+function recordCollected(playerName: string, cardId: number): void {
+  fetch(`${GATEWAY_URL}/api/pokedex/collect`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ player_name: playerName, card_id: cardId }),
+  }).catch(() => {});
+}
+
 export function useGame() {
   const [phase, setPhase] = useState<Phase>("idle");
   const [room, setRoom] = useState<RoomState | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [isFouled, setIsFouled] = useState(false);
+  const [cardResolved, setCardResolved] = useState(false);
   const pendingRef = useRef<Record<string, unknown> | null>(null);
   const playerNameRef = useRef("");
 
@@ -49,12 +64,25 @@ export function useGame() {
     } else if (t === "player_left") {
       setRoom((p) => p ? { ...p, players: p.players.filter((x) => x !== String(msg.player_name)) } : p);
     } else if (t === "game_started") {
+      setCardResolved(false);
       setRoom((p) => p ? { ...p, game: { cards: (msg.cards as Card[]) ?? [], settings: msg.settings as GameSettings, currentCard: null, currentCardIndex: -1, takenCardIds: new Set(), scores: {} } } : p);
       setPhase("playing");
+    } else if (t === "foul") {
+      setRoom((p) => p?.game ? { ...p, game: { ...p.game, scores: msg.scores as Record<string, number> } } : p);
+      if (String(msg.player) === playerNameRef.current) setIsFouled(true);
+      if (msg.all_fouled) setCardResolved(true);
     } else if (t === "card_reading") {
+      setIsFouled(false);
+      setCardResolved(false);
       setRoom((p) => p?.game ? { ...p, game: { ...p.game, currentCard: msg.card as Card, currentCardIndex: msg.index as number } } : p);
     } else if (t === "card_taken") {
-      setRoom((p) => p?.game ? { ...p, game: { ...p.game, takenCardIds: new Set([...p.game.takenCardIds, msg.card_id as number]), scores: msg.scores as Record<string, number> } } : p);
+      const cardId = msg.card_id as number;
+      const winner = String(msg.winner ?? "");
+      setCardResolved(true);
+      setRoom((p) => p?.game ? { ...p, game: { ...p.game, takenCardIds: new Set([...p.game.takenCardIds, cardId]), scores: msg.scores as Record<string, number> } } : p);
+      if (winner && winner === playerNameRef.current) {
+        recordCollected(winner, cardId);
+      }
     } else if (t === "game_over") {
       setRoom((p) => p?.game ? { ...p, game: { ...p.game, scores: msg.scores as Record<string, number> } } : p);
       setPhase("finished");
@@ -99,6 +127,8 @@ export function useGame() {
     setRoom(null);
     setPhase("idle");
     setErrorMsg(null);
+    setIsFouled(false);
+    setCardResolved(false);
   }, [send, disconnect]);
 
   const startGame = useCallback((settings: GameSettings) => send({ type: "start_game", ...settings }), [send]);
@@ -106,5 +136,5 @@ export function useGame() {
   const takeCard = useCallback((cardId: number) => send({ type: "take_card", card_id: cardId }), [send]);
   const resetError = useCallback(() => { setPhase("idle"); setErrorMsg(null); }, []);
 
-  return { phase, room, errorMsg, createRoom, joinRoom, leaveRoom, startGame, nextCard, takeCard, resetError };
+  return { phase, room, errorMsg, isFouled, cardResolved, createRoom, joinRoom, leaveRoom, startGame, nextCard, takeCard, resetError };
 }

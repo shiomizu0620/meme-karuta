@@ -6,9 +6,11 @@ type Props = {
   room: RoomState;
   onTakeCard: (cardId: number) => void;
   onNextCard: () => void;
+  isFouled: boolean;
+  cardResolved: boolean;
 };
 
-export function GameBoard({ room, onTakeCard, onNextCard }: Props) {
+export function GameBoard({ room, onTakeCard, onNextCard, isFouled, cardResolved }: Props) {
   const { game, playerName } = room;
   const utteranceRef = useRef<SpeechSynthesisUtterance | null>(null);
 
@@ -54,7 +56,7 @@ export function GameBoard({ room, onTakeCard, onNextCard }: Props) {
           )}
         </div>
         {isYomite && (
-          <button type="button" className="board__next-btn" onClick={onNextCard}>次の札へ →</button>
+          <button type="button" className="board__next-btn" onClick={onNextCard} disabled={!cardResolved}>次の札へ →</button>
         )}
       </div>
       <div className="board__progress-row">
@@ -63,7 +65,10 @@ export function GameBoard({ room, onTakeCard, onNextCard }: Props) {
           <div className="board__progress-fill" style={{ width: `${(totalTaken / totalCards) * 100}%` }} />
         </div>
       </div>
-      <div className="board__grid">
+      {isFouled && (
+        <div className="board__foul-banner">お手付き！次の札まで参加できません</div>
+      )}
+      <div className={`board__grid${isFouled ? " board__grid--locked" : ""}`}>
         {remainingCards.map((card) => (
           <EfudaCard key={card.id} card={card} taken={false} takenBy={null} isMe={false} onClick={() => onTakeCard(card.id)} />
         ))}

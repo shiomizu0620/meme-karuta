@@ -65,9 +65,10 @@ defmodule Realtime.SocketHandler do
   end
 
   defp dispatch(%{"type" => "start_game"} = msg, state) do
+    selected_sets = Map.get(msg, "selected_sets", [])
     with {:ok, room_id} <- require_in_room(state),
          :ok <- require_host(room_id, state.player_name),
-         {:ok, cards} <- fetch_cards(),
+         {:ok, cards} <- fetch_cards(selected_sets),
          {:ok, shuffled} <- shuffle_cards(cards) do
       settings = %{"yomite_mode" => Map.get(msg, "yomite_mode", "ai"),
                    "yomite_name" => Map.get(msg, "yomite_name", state.player_name),
@@ -103,15 +104,21 @@ defmodule Realtime.SocketHandler do
     card_id = Map.get(msg, "card_id")
     with {:ok, room_id} <- require_in_room(state),
          :ok <- validate_card_id(card_id) do
-      case call_judge(room_id, card_id, state.player_name) do
-        :won ->
-          case Realtime.Room.take_card(room_id, card_id, state.player_name) do
-            {:ok, _} -> {:ok, state}
-            {:game_over, _} -> {:ok, state}
-            {:error, reason} -> reply(error(reason), state)
+      case Realtime.Room.attempt_take(room_id, card_id, state.player_name) do
+        :valid ->
+          case call_judge(room_id, card_id, state.player_name) do
+            :won ->
+              case Realtime.Room.take_card(room_id, card_id, state.player_name) do
+                {:ok, _} -> {:ok, state}
+                {:game_over, _} -> {:ok, state}
+                {:error, reason} -> reply(error(reason), state)
+              end
+            :lost -> reply(%{type: "card_missed", card_id: card_id}, state)
+            :error -> reply(error("判定サービスに接続できませんでした"), state)
           end
-        :lost -> reply(%{type: "card_missed", card_id: card_id}, state)
-        :error -> reply(error("判定サービスに接続できませんでした"), state)
+        {:foul, _} -> {:ok, state}
+        {:error, :fouled} -> {:ok, state}
+        {:error, reason} -> reply(error(reason), state)
       end
     else
       {:error, reason} -> reply(error(reason), state)
@@ -120,8 +127,13 @@ defmodule Realtime.SocketHandler do
 
   defp dispatch(_, state), do: reply(error("unknown message type"), state)
 
-  defp fetch_cards do
-    case :httpc.request(:get, {String.to_charlist(card_gen_url() <> "/cards"), []}, [], body_format: :string) do
+  defp fetch_cards(selected_sets) when is_list(selected_sets) do
+    sets_qs = case selected_sets do
+      [] -> ""
+      ids -> "?sets=" <> Enum.join(ids, ",")
+    end
+    url = String.to_charlist(card_gen_url() <> "/cards" <> sets_qs)
+    case :httpc.request(:get, {url, []}, [], body_format: :string) do
       {:ok, {{_, 200, _}, _, body}} ->
         case Jason.decode(body) do
           {:ok, %{"cards" => cards}} when is_list(cards) -> {:ok, cards}

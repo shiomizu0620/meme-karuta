@@ -1,12 +1,17 @@
 """
-カードデータ生成スクリプト。
-CARDS リストからJSON出力する。バリデーション・カテゴリ管理・検索機能付き。
+カードデータの集約・バリデーション・JSON 出力。
+
+カードデータは `data/cards/*.yaml` を loader.py 経由で読み込む。本モジュールは
+バリデーション・検索・統計などの純粋ロジックを提供しつつ、CLI から実行されたときは
+集約済みデータを `cards.json` に書き出すオフラインビルダーとして動く。
 """
 
 import json
 import os
 import re
 from typing import TypedDict
+
+from loader import DEFAULT_DATA_DIR, LoaderError, load_all
 
 OUTPUT_PATH = os.path.join(os.path.dirname(__file__), "cards.json")
 
@@ -17,43 +22,23 @@ class CardDict(TypedDict):
     yomi: str
     image: str
     category: str
+    set: str
 
 
-# ---- カードデータ ----
+# ---- 起動時データロード ----
 
-CARDS: list[CardDict] = [
-    {"id": 1,  "fuda": "そうはならんやろ",    "yomi": "誰がどう見てもそうなるのに本人だけ気づいていないとき",                     "image": "/images/souhanarannyaro.jpg",  "category": "反応"},
-    {"id": 2,  "fuda": "やめろ",              "yomi": "見ているだけで胃が痛くなる展開が始まったとき",                           "image": "/images/yamero.jpg",           "category": "反応"},
-    {"id": 3,  "fuda": "許せ",               "yomi": "自分のミスを棚に上げて被害者面しているとき",                             "image": "/images/yuruse.jpg",           "category": "反応"},
-    {"id": 4,  "fuda": "は？",               "yomi": "予想の斜め上をいく意味不明な発言をされたとき",                           "image": "/images/ha.jpg",               "category": "反応"},
-    {"id": 5,  "fuda": "わかる",             "yomi": "言語化できなかった感情をズバリ言い当てられたとき",                       "image": "/images/wakaru.jpg",           "category": "共感"},
-    {"id": 6,  "fuda": "無理",               "yomi": "どう頑張っても回避できない状況に追い込まれたとき",                       "image": "/images/muri.jpg",             "category": "反応"},
-    {"id": 7,  "fuda": "天才か",             "yomi": "誰も思いつかなかった発想でサラッと問題を解決したとき",                   "image": "/images/tensaika.jpg",         "category": "褒め"},
-    {"id": 8,  "fuda": "草",                 "yomi": "笑いをこらえられない状況が突然発生したとき",                             "image": "/images/kusa.jpg",             "category": "笑い"},
-    {"id": 9,  "fuda": "お前が言うな",        "yomi": "最もその発言をしてはいけない人物がその発言をしたとき",                   "image": "/images/omaegaiune.jpg",       "category": "ツッコミ"},
-    {"id": 10, "fuda": "知らんがな",          "yomi": "自分には一切関係のない問題を押し付けられたとき",                         "image": "/images/shirangana.jpg",       "category": "ツッコミ"},
-    {"id": 11, "fuda": "なんでやねん",        "yomi": "理由もなく突然理不尽なことが起きて困惑したとき",                         "image": "/images/nandeyanen.jpg",       "category": "ツッコミ"},
-    {"id": 12, "fuda": "ほんこれ",            "yomi": "誰かの意見が自分の気持ちを完璧に代弁してくれたとき",                     "image": "/images/honkore.jpg",          "category": "共感"},
-    {"id": 13, "fuda": "尊い",               "yomi": "圧倒的な可愛さや美しさに心が浄化される瞬間",                             "image": "/images/toutoi.jpg",           "category": "褒め"},
-    {"id": 14, "fuda": "は？待って",          "yomi": "情報の処理が追いつかずフリーズしたとき",                                 "image": "/images/hamatte.jpg",          "category": "反応"},
-    {"id": 15, "fuda": "終わった",            "yomi": "修正不可能なミスをしたと気づいた瞬間",                                   "image": "/images/owatta.jpg",           "category": "絶望"},
-    {"id": 16, "fuda": "正論すぎる",          "yomi": "反論の余地がない事実を突きつけられて黙るしかないとき",                   "image": "/images/seironsugiru.jpg",     "category": "共感"},
-    {"id": 17, "fuda": "ぴえん",              "yomi": "小さな悲しみや失望が重なって涙が出そうになるとき",                       "image": "/images/pien.jpg",             "category": "感情"},
-    {"id": 18, "fuda": "エモい",              "yomi": "懐かしさや切なさが混ざった感情が突然込み上げてきたとき",                 "image": "/images/emoi.jpg",             "category": "感情"},
-    {"id": 19, "fuda": "待って笑う",          "yomi": "笑ってはいけない場面で笑いが止まらなくなったとき",                       "image": "/images/mattewarau.jpg",       "category": "笑い"},
-    {"id": 20, "fuda": "なんも言えねぇ",      "yomi": "あまりにも衝撃的な出来事に言葉を失ったとき",                             "image": "/images/nanmoienee.jpg",       "category": "絶望"},
-    {"id": 21, "fuda": "ガチ恋",              "yomi": "ゲームのキャラや配信者に本気で心を奪われたとき",                         "image": "/images/gachikoi.jpg",         "category": "感情"},
-    {"id": 22, "fuda": "それはそう",          "yomi": "当たり前すぎる事実を改めて確認されたとき",                               "image": "/images/sorehasou.jpg",        "category": "共感"},
-    {"id": 23, "fuda": "もう無理かもしれん",  "yomi": "限界を超えた疲労感が全身に広がったとき",                                 "image": "/images/moumurikamo.jpg",      "category": "絶望"},
-    {"id": 24, "fuda": "ありがとうございました", "yomi": "何かが完全に終わった瞬間に使う万能締めの言葉",                       "image": "/images/arigatougozaimashita.jpg", "category": "挨拶"},
-    {"id": 25, "fuda": "やばい",              "yomi": "良い意味でも悪い意味でも感情が追いつかないとき",                         "image": "/images/yabai.jpg",            "category": "反応"},
-    {"id": 26, "fuda": "分かりみ",            "yomi": "相手の言っていることに深く共鳴したとき",                                 "image": "/images/wakarimi.jpg",         "category": "共感"},
-    {"id": 27, "fuda": "さすがやな",          "yomi": "予想通りの実力を見せてくれたときの素直な称賛",                           "image": "/images/sasugayana.jpg",       "category": "褒め"},
-    {"id": 28, "fuda": "もしかして天才？",    "yomi": "普通では思いつかないような発想に出会ったとき",                           "image": "/images/moshikasite_tensai.jpg", "category": "褒め"},
-    {"id": 29, "fuda": "それな",              "yomi": "相手の発言が自分の考えと完全に一致したとき",                             "image": "/images/sorena.jpg",           "category": "共感"},
-    {"id": 30, "fuda": "お疲れ様でした",      "yomi": "激しい戦いや作業がようやく終わったとき",                                 "image": "/images/otsukaresama.jpg",     "category": "挨拶"},
-]
+CARDS: list[CardDict]
+SETS: list[dict]
 
+try:
+    _loaded_cards, _loaded_sets = load_all(DEFAULT_DATA_DIR)
+    CARDS = _loaded_cards  # type: ignore[assignment]
+    SETS = [dict(s) for s in _loaded_sets]
+except LoaderError as e:
+    print(f"[FATAL] カードデータのロードに失敗: {e}")
+    raise
+
+SET_IDS = [s["id"] for s in SETS]
 CATEGORIES = sorted(set(c["category"] for c in CARDS))
 
 
@@ -98,6 +83,12 @@ def validate_all(cards: list[CardDict]) -> dict[int, list[str]]:
 
 def filter_by_category(cards: list[CardDict], category: str) -> list[CardDict]:
     return [c for c in cards if c.get("category") == category]
+
+
+def filter_by_sets(cards: list[CardDict], set_ids: list[str]) -> list[CardDict]:
+    if not set_ids:
+        return cards
+    return [c for c in cards if c.get("set") in set_ids]
 
 
 def search_cards(cards: list[CardDict], query: str) -> list[CardDict]:
@@ -152,7 +143,7 @@ def export_categories_json(path: str | None = None) -> str:
     return result
 
 
-# ---- 外部ファイルからの読み込み ----
+# ---- 外部ファイルからの読み込み（プライベートデッキ等の上書き用） ----
 
 def load_cards_from_file(path: str) -> list[CardDict]:
     """外部 JSON ファイルからカードリストを読み込む。形式エラーは例外を投げる。"""
@@ -225,95 +216,20 @@ def ranked_search(cards: list[CardDict], query: str, limit: int = 20) -> list[Ca
     return [c for _, c in scored[:limit]]
 
 
-# ---- HTTP サーバー ----
-
-def build_app(cards: list[CardDict]):
-    from http.server import BaseHTTPRequestHandler
-    from urllib.parse import urlparse, parse_qs
-
-    by_id = cards_by_id(cards)
-
-    class Handler(BaseHTTPRequestHandler):
-        def log_message(self, fmt, *args):
-            return  # quiet
-
-        def _send_json(self, status: int, payload) -> None:
-            body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
-            self.send_response(status)
-            self.send_header("Content-Type", "application/json; charset=utf-8")
-            self.send_header("Access-Control-Allow-Origin", "*")
-            self.send_header("Content-Length", str(len(body)))
-            self.end_headers()
-            self.wfile.write(body)
-
-        def do_GET(self):  # noqa: N802
-            parsed = urlparse(self.path)
-            path = parsed.path
-            qs = parse_qs(parsed.query)
-
-            if path == "/health":
-                self._send_json(200, {"status": "ok", "card_count": len(cards)})
-            elif path == "/cards":
-                cat = (qs.get("category") or [None])[0]
-                result = filter_by_category(cards, cat) if cat else cards
-                self._send_json(200, result)
-            elif path.startswith("/cards/"):
-                try:
-                    cid = int(path.removeprefix("/cards/"))
-                except ValueError:
-                    self._send_json(400, {"error": "invalid id"}); return
-                card = by_id.get(cid)
-                if card is None:
-                    self._send_json(404, {"error": "card not found"}); return
-                self._send_json(200, card)
-            elif path == "/categories":
-                self._send_json(200, {"categories": CATEGORIES, "stats": get_category_stats(cards)})
-            elif path == "/search":
-                q = (qs.get("q") or [""])[0]
-                limit = int((qs.get("limit") or ["20"])[0])
-                limit = max(1, min(limit, 100))
-                self._send_json(200, ranked_search(cards, q, limit=limit))
-            elif path == "/stats":
-                self._send_json(200, {
-                    "total": len(cards),
-                    "by_category": get_category_stats(cards),
-                    "validation_errors": validate_all(cards),
-                })
-            else:
-                self._send_json(404, {"error": "not found"})
-
-    return Handler
-
-
-def run_server(host: str = "0.0.0.0", port: int = 5000) -> None:
-    from http.server import HTTPServer
-    server = HTTPServer((host, port), build_app(CARDS))
-    audit_log("server_start", f"{host}:{port}")
-    print(f"card-gen listening on {host}:{port}")
-    try:
-        server.serve_forever()
-    finally:
-        audit_log("server_stop", f"{host}:{port}")
-
-
 # ---- エントリーポイント ----
 
 def main() -> None:
-    mode = os.environ.get("CARD_GEN_MODE", "generate")
-    if mode == "serve":
-        port = int(os.environ.get("PORT", "5000"))
-        run_server(port=port)
-    else:
-        extra_path = os.environ.get("CARDS_EXTRA_PATH")
-        cards: list[CardDict] = list(CARDS)
-        if extra_path:
-            try:
-                extra = load_cards_from_file(extra_path)
-                cards = merge_cards(cards, extra)
-                audit_log("merge", f"loaded {len(extra)} from {extra_path}")
-            except (FileNotFoundError, ValueError) as e:
-                print(f"[WARN] could not load extra cards: {e}")
-        generate(cards)
+    cards: list[CardDict] = list(CARDS)
+    extra_path = os.environ.get("CARDS_EXTRA_PATH")
+    if extra_path:
+        try:
+            extra = load_cards_from_file(extra_path)
+            cards = merge_cards(cards, extra)
+            audit_log("merge", f"loaded {len(extra)} from {extra_path}")
+        except (FileNotFoundError, ValueError) as e:
+            print(f"[WARN] could not load extra cards: {e}")
+    audit_log("generate", f"{len(cards)} cards from {DEFAULT_DATA_DIR}")
+    generate(cards)
 
 
 # ---- ユニットテスト ----
@@ -375,6 +291,17 @@ def _self_test() -> None:
         def test_get_category_stats_sums_to_total(self):
             stats = get_category_stats(CARDS)
             self.assertEqual(sum(stats.values()), len(CARDS))
+
+    class LoaderIntegrationTests(unittest.TestCase):
+        def test_all_30_cards_loaded(self):
+            self.assertEqual(len(CARDS), 30)
+
+        def test_all_3_sets_loaded(self):
+            self.assertEqual(len(SETS), 3)
+
+        def test_every_card_has_set(self):
+            for c in CARDS:
+                self.assertIn(c["set"], SET_IDS)
 
     suite = unittest.TestLoader().loadTestsFromModule(__import__(__name__))
     unittest.TextTestRunner(verbosity=2).run(suite)

@@ -224,27 +224,44 @@ const [flipped, setFlipped] = useState(false);
 
 ## カードデータ形式
 
+### 配信フォーマット（API レスポンス・cards.json）
+
 ```typescript
-// services/frontend/src/data/cards.ts
 export interface Card {
   id: number;
   fuda: string;       // 絵札テキスト（ミーム名）
   yomi: string;       // 読み文
   image: string;      // 画像パス（例: /images/souhanarannyaro.jpg）
+  category: string;   // カテゴリ（反応 / 共感 / ツッコミ etc）
+  set: string;        // 所属セット ID (basic / sns / emotion ...)
 }
 ```
 
-```python
-# services/card-gen/generate.py が cards.json を生成
-[
-  {
-    "id": 1,
-    "fuda": "そうはならんやろ",
-    "yomi": "誰がどう見てもそうなるのに本人だけ気づいていないとき",
-    "image": "/images/souhanarannyaro.jpg"
-  }
-]
+### マスターデータ（編集対象）
+
+カードデータは `services/card-gen/data/cards/*.yaml` に **セット単位の YAML** で保存。
+`generate.py` / `app.py` にはハードコードしない。詳しい追加手順は
+`services/card-gen/data/README.md` を参照。
+
+```yaml
+# services/card-gen/data/cards/basic.yaml
+set:
+  id: basic
+  name: 基本セット
+  description: 定番のネットミーム10枚
+cards:
+  - id: 1
+    fuda: そうはならんやろ
+    yomi: 誰がどう見てもそうなるのに本人だけ気づいていないとき
+    image: souhanarannyaro.jpg   # /images/ プレフィックスは loader が付与
+    category: 反応
 ```
+
+カード追加の流れ:
+
+1. 該当 YAML の `cards:` に 1 ブロック追加（ID は全ファイル横断でユニーク）
+2. 画像を `services/frontend/public/images/` に置く
+3. `docker compose restart card-gen`
 
 ---
 

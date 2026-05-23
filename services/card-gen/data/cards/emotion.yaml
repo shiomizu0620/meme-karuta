@@ -1,0 +1,65 @@
+set:
+  id: emotion
+  name: 感情ミーム
+  description: 感情表現に特化したミーム10枚
+
+cards:
+  - id: 21
+    fuda: ガチ恋
+    yomi: ゲームのキャラや配信者に本気で心を奪われたとき
+    image: gachikoi.jpg
+    category: 感情
+
+  - id: 22
+    fuda: それはそう
+    yomi: 当たり前すぎる事実を改めて確認されたとき
+    image: sorehasou.jpg
+    category: 共感
+
+  - id: 23
+    fuda: もう無理かもしれん
+    yomi: 限界を超えた疲労感が全身に広がったとき
+    image: moumurikamo.jpg
+    category: 絶望
+
+  - id: 24
+    fuda: ありがとうございました
+    yomi: 何かが完全に終わった瞬間に使う万能締めの言葉
+    image: arigatougozaimashita.jpg
+    category: 挨拶
+
+  - id: 25
+    fuda: やばい
+    yomi: 良い意味でも悪い意味でも感情が追いつかないとき
+    image: yabai.jpg
+    category: 反応
+
+  - id: 26
+    fuda: 分かりみ
+    yomi: 相手の言っていることに深く共鳴したとき
+    image: wakarimi.jpg
+    category: 共感
+
+  - id: 27
+    fuda: さすがやな
+    yomi: 予想通りの実力を見せてくれたときの素直な称賛
+    image: sasugayana.jpg
+    category: 褒め
+
+  - id: 28
+    fuda: もしかして天才？
+    yomi: 普通では思いつかないような発想に出会ったとき
+    image: moshikasite_tensai.jpg
+    category: 褒め
+
+  - id: 29
+    fuda: それな
+    yomi: 相手の発言が自分の考えと完全に一致したとき
+    image: sorena.jpg
+    category: 共感
+
+  - id: 30
+    fuda: お疲れ様でした
+    yomi: 激しい戦いや作業がようやく終わったとき
+    image: otsukaresama.jpg
+    category: 挨拶
