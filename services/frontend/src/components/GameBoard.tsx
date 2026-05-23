@@ -68,9 +68,9 @@ export function GameBoard({ room, onTakeCard, onNextCard, isFouled, cardResolved
       {isFouled && (
         <div className="board__foul-banner">お手付き！次の札まで参加できません</div>
       )}
-      <div className={`board__grid${isFouled ? " board__grid--locked" : ""}`}>
+      <div className={`board__grid${isFouled || cardResolved ? " board__grid--locked" : ""}`}>
         {remainingCards.map((card) => (
-          <EfudaCard key={card.id} card={card} taken={false} takenBy={null} isMe={false} onClick={() => onTakeCard(card.id)} />
+          <EfudaCard key={card.id} card={card} taken={false} takenBy={null} isMe={false} onClick={() => { if (!cardResolved) onTakeCard(card.id); }} />
         ))}
         {takenCards.map((card) => (
           <EfudaCard key={card.id} card={card} taken takenBy={null} isMe={false} onClick={() => {}} />

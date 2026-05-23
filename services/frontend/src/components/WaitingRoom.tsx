@@ -16,7 +16,7 @@ const GATEWAY_URL =
   (import.meta as unknown as { env: Record<string, string> }).env
     .VITE_GATEWAY_URL ?? "http://localhost:8080";
 
-const DEFAULT_SET_IDS = ["basic", "sns", "emotion"];
+const DEFAULT_SET_IDS = ["basic", "sns", "tv", "anime_manga"];
 
 export function WaitingRoom({ roomId, players, isHost, playerName, onLeave, onStartGame }: Props) {
   const [copied, setCopied] = useState(false);

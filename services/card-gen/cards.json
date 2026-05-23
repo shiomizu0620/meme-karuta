@@ -1,242 +1,394 @@
 [
   {
     "id": 1,
-    "fuda": "そうはならんやろ",
-    "yomi": "誰がどう見てもそうなるのに本人だけ気づいていないとき",
-    "image": "/images/souhanarannyaro.jpg",
-    "category": "反応",
-    "set": "basic"
+    "fuda": "えっほえっほ",
+    "yomi": "えっほえっほ",
+    "image": "/images/えっほえっほ.jpg",
+    "category": "SNS",
+    "set": "sns"
   },
   {
     "id": 2,
-    "fuda": "やめろ",
-    "yomi": "見ているだけで胃が痛くなる展開が始まったとき",
-    "image": "/images/yamero.jpg",
-    "category": "反応",
-    "set": "basic"
+    "fuda": "東大医学部",
+    "yomi": "頭悪くないか？東大医学部あたまわるい！！",
+    "image": "/images/東大医学部.jpg",
+    "category": "SNS",
+    "set": "sns"
   },
   {
     "id": 3,
-    "fuda": "許せ",
-    "yomi": "自分のミスを棚に上げて被害者面しているとき",
-    "image": "/images/yuruse.jpg",
-    "category": "反応",
-    "set": "basic"
+    "fuda": "3選",
+    "yomi": "俺が開発をする理由3選",
+    "image": "/images/3選.png",
+    "category": "SNS",
+    "set": "sns"
   },
   {
     "id": 4,
-    "fuda": "は？",
-    "yomi": "予想の斜め上をいく意味不明な発言をされたとき",
-    "image": "/images/ha.jpg",
-    "category": "反応",
-    "set": "basic"
+    "fuda": "大泉洋",
+    "yomi": "またしても何も知らない大泉洋",
+    "image": "/images/またしても何も知らない.jpg",
+    "category": "SNS",
+    "set": "sns"
   },
   {
     "id": 5,
-    "fuda": "わかる",
-    "yomi": "言語化できなかった感情をズバリ言い当てられたとき",
-    "image": "/images/wakaru.jpg",
-    "category": "共感",
-    "set": "basic"
+    "fuda": "二郎",
+    "yomi": "(神田神保町店は)レベルの高い合格点を超える二郎オールウェイズ出してくれる",
+    "image": "/images/レベルの高い合格点を.jpg",
+    "category": "SNS",
+    "set": "sns"
   },
   {
     "id": 6,
-    "fuda": "無理",
-    "yomi": "どう頑張っても回避できない状況に追い込まれたとき",
-    "image": "/images/muri.jpg",
-    "category": "反応",
-    "set": "basic"
+    "fuda": "容態急変",
+    "yomi": "容態急変FULL",
+    "image": "/images/容態急変FULL.png",
+    "category": "SNS",
+    "set": "sns"
   },
   {
     "id": 7,
-    "fuda": "天才か",
-    "yomi": "誰も思いつかなかった発想でサラッと問題を解決したとき",
-    "image": "/images/tensaika.jpg",
-    "category": "褒め",
-    "set": "basic"
+    "fuda": "ギャラクティック・ノヴァには",
+    "yomi": "しかしギャラクティック・ノヴァには狙いがあった",
+    "image": "/images/しかしギャラクティックノヴァ.jpg",
+    "category": "SNS",
+    "set": "sns"
   },
   {
     "id": 8,
-    "fuda": "草",
-    "yomi": "笑いをこらえられない状況が突然発生したとき",
-    "image": "/images/kusa.jpg",
-    "category": "笑い",
-    "set": "basic"
+    "fuda": "でも幸せなら",
+    "yomi": "でも幸せならOKです",
+    "image": "/images/でも幸せなら.jpg",
+    "category": "テレビ",
+    "set": "tv"
   },
   {
     "id": 9,
-    "fuda": "お前が言うな",
-    "yomi": "最もその発言をしてはいけない人物がその発言をしたとき",
-    "image": "/images/omaegaiune.jpg",
-    "category": "ツッコミ",
-    "set": "basic"
+    "fuda": "助けてください",
+    "yomi": "あえて申し上げます。助けてください。",
+    "image": "/images/あえて申し上げます.jpg",
+    "category": "テレビ",
+    "set": "tv"
   },
   {
     "id": 10,
-    "fuda": "知らんがな",
-    "yomi": "自分には一切関係のない問題を押し付けられたとき",
-    "image": "/images/shirangana.jpg",
-    "category": "ツッコミ",
-    "set": "basic"
+    "fuda": "明日にしよう",
+    "yomi": "あしたにしようあしたにしようってどんどんどんどん先延ばしにしていまして",
+    "image": "/images/あしたにしよう.jpg",
+    "category": "テレビ",
+    "set": "tv"
   },
   {
     "id": 11,
-    "fuda": "なんでやねん",
-    "yomi": "理由もなく突然理不尽なことが起きて困惑したとき",
-    "image": "/images/nandeyanen.jpg",
-    "category": "ツッコミ",
-    "set": "sns"
+    "fuda": "うんち！",
+    "yomi": "うんち！(せいかいのおと)",
+    "image": "/images/正解のおと.png",
+    "category": "テレビ",
+    "set": "tv"
   },
   {
     "id": 12,
-    "fuda": "ほんこれ",
-    "yomi": "誰かの意見が自分の気持ちを完璧に代弁してくれたとき",
-    "image": "/images/honkore.jpg",
-    "category": "共感",
-    "set": "sns"
+    "fuda": "反省してまーす",
+    "yomi": "チッうるせいな。反省してまーす。",
+    "image": "/images/反省してます.jpg",
+    "category": "テレビ",
+    "set": "tv"
   },
   {
     "id": 13,
-    "fuda": "尊い",
-    "yomi": "圧倒的な可愛さや美しさに心が浄化される瞬間",
-    "image": "/images/toutoi.jpg",
-    "category": "褒め",
-    "set": "sns"
+    "fuda": "そんなに",
+    "yomi": "そんなに興奮しないでください。お疲れ様でした。",
+    "image": "/images/そんなに興奮しないで.jpg",
+    "category": "テレビ",
+    "set": "tv"
   },
   {
     "id": 14,
-    "fuda": "は？待って",
-    "yomi": "情報の処理が追いつかずフリーズしたとき",
-    "image": "/images/hamatte.jpg",
-    "category": "反応",
-    "set": "sns"
+    "fuda": "お前もう船降りろ",
+    "yomi": "お前、もう船降りろ",
+    "image": "/images/お前もう船降りろ.jpg",
+    "category": "漫画・アニメ",
+    "set": "anime_manga"
   },
   {
     "id": 15,
-    "fuda": "終わった",
-    "yomi": "修正不可能なミスをしたと気づいた瞬間",
-    "image": "/images/owatta.jpg",
-    "category": "絶望",
-    "set": "sns"
+    "fuda": "開発者俺だもん",
+    "yomi": "そいつの開発者俺だもん",
+    "image": "/images/そいつの開発者.jpg",
+    "category": "漫画・アニメ",
+    "set": "anime_manga"
   },
   {
     "id": 16,
-    "fuda": "正論すぎる",
-    "yomi": "反論の余地がない事実を突きつけられて黙るしかないとき",
-    "image": "/images/seironsugiru.jpg",
-    "category": "共感",
-    "set": "sns"
+    "fuda": "鱗滝",
+    "yomi": "判断が遅い",
+    "image": "/images/判断が遅い.jpg",
+    "category": "漫画・アニメ",
+    "set": "anime_manga"
   },
   {
     "id": 17,
-    "fuda": "ぴえん",
-    "yomi": "小さな悲しみや失望が重なって涙が出そうになるとき",
-    "image": "/images/pien.jpg",
-    "category": "感情",
-    "set": "sns"
+    "fuda": "粉バナナ",
+    "yomi": "粉バナナ",
+    "image": "/images/粉バナナ.png",
+    "category": "漫画・アニメ",
+    "set": "anime_manga"
   },
   {
     "id": 18,
-    "fuda": "エモい",
-    "yomi": "懐かしさや切なさが混ざった感情が突然込み上げてきたとき",
-    "image": "/images/emoi.jpg",
-    "category": "感情",
-    "set": "sns"
+    "fuda": "おっとそろそろ",
+    "yomi": "おっとそろそろ時間だ、俺は狂うから消えていいよ",
+    "image": "/images/おっとそろそろ時間.png",
+    "category": "漫画・アニメ",
+    "set": "anime_manga"
   },
   {
     "id": 19,
-    "fuda": "待って笑う",
-    "yomi": "笑ってはいけない場面で笑いが止まらなくなったとき",
-    "image": "/images/mattewarau.jpg",
-    "category": "笑い",
-    "set": "sns"
+    "fuda": "奇行種なのか",
+    "yomi": "無視だと！？奇行種なのか！？",
+    "image": "/images/無視だと.jpg",
+    "category": "漫画・アニメ",
+    "set": "anime_manga"
   },
   {
     "id": 20,
-    "fuda": "なんも言えねぇ",
-    "yomi": "あまりにも衝撃的な出来事に言葉を失ったとき",
-    "image": "/images/nanmoienee.jpg",
-    "category": "絶望",
-    "set": "sns"
+    "fuda": "人の心",
+    "yomi": "ひどいなあ。人の心とか無いんか？",
+    "image": "/images/人の心.jpg",
+    "category": "漫画・アニメ",
+    "set": "anime_manga"
   },
   {
     "id": 21,
-    "fuda": "ガチ恋",
-    "yomi": "ゲームのキャラや配信者に本気で心を奪われたとき",
-    "image": "/images/gachikoi.jpg",
-    "category": "感情",
-    "set": "emotion"
+    "fuda": "どちらもありうる",
+    "yomi": "どちらもありうる......そんだけだ",
+    "image": "/images/どちらもありうる.png",
+    "category": "漫画・アニメ",
+    "set": "anime_manga"
   },
   {
     "id": 22,
-    "fuda": "それはそう",
-    "yomi": "当たり前すぎる事実を改めて確認されたとき",
-    "image": "/images/sorehasou.jpg",
-    "category": "共感",
-    "set": "emotion"
+    "fuda": "やるんだな",
+    "yomi": "やるんだな！？今...!ここで!",
+    "image": "/images/やるんだな.jpeg",
+    "category": "漫画・アニメ",
+    "set": "anime_manga"
   },
   {
     "id": 23,
-    "fuda": "もう無理かもしれん",
-    "yomi": "限界を超えた疲労感が全身に広がったとき",
-    "image": "/images/moumurikamo.jpg",
-    "category": "絶望",
-    "set": "emotion"
+    "fuda": "それはアリだ",
+    "yomi": "それはアリだ",
+    "image": "/images/それはありだ.jpg",
+    "category": "漫画・アニメ",
+    "set": "anime_manga"
   },
   {
     "id": 24,
-    "fuda": "ありがとうございました",
-    "yomi": "何かが完全に終わった瞬間に使う万能締めの言葉",
-    "image": "/images/arigatougozaimashita.jpg",
-    "category": "挨拶",
-    "set": "emotion"
+    "fuda": "一番弱い人が",
+    "yomi": "一番弱い人が一番可能性を持ってるんだよ玄弥",
+    "image": "/images/一番弱い人が.png",
+    "category": "漫画・アニメ",
+    "set": "anime_manga"
   },
   {
     "id": 25,
-    "fuda": "やばい",
-    "yomi": "良い意味でも悪い意味でも感情が追いつかないとき",
-    "image": "/images/yabai.jpg",
-    "category": "反応",
-    "set": "emotion"
+    "fuda": "おぼふ",
+    "yomi": "おぼふ",
+    "image": "/images/おぼふ.png",
+    "category": "漫画・アニメ",
+    "set": "anime_manga"
   },
   {
     "id": 26,
-    "fuda": "分かりみ",
-    "yomi": "相手の言っていることに深く共鳴したとき",
-    "image": "/images/wakarimi.jpg",
-    "category": "共感",
-    "set": "emotion"
+    "fuda": "鬼にならないか？",
+    "yomi": "お前も鬼にならないか？",
+    "image": "/images/お前も鬼にならないか.png",
+    "category": "漫画・アニメ",
+    "set": "anime_manga"
   },
   {
     "id": 27,
-    "fuda": "さすがやな",
-    "yomi": "予想通りの実力を見せてくれたときの素直な称賛",
-    "image": "/images/sasugayana.jpg",
-    "category": "褒め",
-    "set": "emotion"
+    "fuda": "何が嫌いかより",
+    "yomi": "何が嫌いかより何が好きかで自分を語れよ",
+    "image": "/images/何が嫌いかより.png",
+    "category": "漫画・アニメ",
+    "set": "anime_manga"
   },
   {
     "id": 28,
-    "fuda": "もしかして天才？",
-    "yomi": "普通では思いつかないような発想に出会ったとき",
-    "image": "/images/moshikasite_tensai.jpg",
-    "category": "褒め",
-    "set": "emotion"
+    "fuda": "会話はマキマに",
+    "yomi": "会話はマキマに聞かれている",
+    "image": "/images/会話はマキマに.jpg",
+    "category": "漫画・アニメ",
+    "set": "anime_manga"
   },
   {
     "id": 29,
-    "fuda": "それな",
-    "yomi": "相手の発言が自分の考えと完全に一致したとき",
-    "image": "/images/sorena.jpg",
-    "category": "共感",
-    "set": "emotion"
+    "fuda": "勘のいいガキは",
+    "yomi": "勘のいいガキは嫌いだよ",
+    "image": "/images/勘のいいガキは.jpg",
+    "category": "漫画・アニメ",
+    "set": "anime_manga"
   },
   {
     "id": 30,
-    "fuda": "お疲れ様でした",
-    "yomi": "激しい戦いや作業がようやく終わったとき",
-    "image": "/images/otsukaresama.jpg",
-    "category": "挨拶",
-    "set": "emotion"
+    "fuda": "男の人って",
+    "yomi": "男の人っていつもそうですよね",
+    "image": "/images/男の人って.png",
+    "category": "漫画・アニメ",
+    "set": "anime_manga"
+  },
+  {
+    "id": 31,
+    "fuda": "諦めたら",
+    "yomi": "諦めたらそこで試合終了ですよ",
+    "image": "/images/諦めたら.jpg",
+    "category": "漫画・アニメ",
+    "set": "anime_manga"
+  },
+  {
+    "id": 32,
+    "fuda": "計画通り",
+    "yomi": "計画通り",
+    "image": "/images/計画通り.jpg",
+    "category": "漫画・アニメ",
+    "set": "anime_manga"
+  },
+  {
+    "id": 33,
+    "fuda": "毒ガス訓練",
+    "yomi": "えっ！今日は全員カレーライス食っていいのか！！おかわりもいいぞ！！",
+    "image": "/images/今日はカレーライス.jpg",
+    "category": "漫画・アニメ",
+    "set": "anime_manga"
+  },
+  {
+    "id": 34,
+    "fuda": "21歳",
+    "yomi": "もちろん俺らは抵抗するで。拳で。",
+    "image": "/images/21歳.jpg",
+    "category": "漫画・アニメ",
+    "set": "anime_manga"
+  },
+  {
+    "id": 35,
+    "fuda": "抱けっ！",
+    "yomi": "抱けッ！抱けえッ！抱けー！",
+    "image": "/images/抱け.webp",
+    "category": "漫画・アニメ",
+    "set": "anime_manga"
+  },
+  {
+    "id": 36,
+    "fuda": "霊圧が",
+    "yomi": "チャドの霊圧が......消えた...?",
+    "image": "/images/消えた.jpg",
+    "category": "漫画・アニメ",
+    "set": "anime_manga"
+  },
+  {
+    "id": 37,
+    "fuda": "錯覚していた？",
+    "yomi": "一体いつから鏡花水月を使っていないと錯覚していた？",
+    "image": "/images/錯覚.jpg",
+    "category": "漫画・アニメ",
+    "set": "anime_manga"
+  },
+  {
+    "id": 38,
+    "fuda": "だが断る",
+    "yomi": "だが断る",
+    "image": "/images/だが断る.webp",
+    "category": "漫画・アニメ",
+    "set": "anime_manga"
+  },
+  {
+    "id": 39,
+    "fuda": "何故俺は",
+    "yomi": "何故俺は苛立っている...？",
+    "image": "/images/なぜおれは.jpg",
+    "category": "漫画・アニメ",
+    "set": "anime_manga"
+  },
+  {
+    "id": 41,
+    "fuda": "えっほえっほ",
+    "yomi": "えっほえっほ",
+    "image": "/images/えっほえっほ.jpg",
+    "category": "SNS",
+    "set": "basic"
+  },
+  {
+    "id": 42,
+    "fuda": "東大医学部",
+    "yomi": "頭悪くないか？東大医学部あたまわるい！！",
+    "image": "/images/東大医学部.jpg",
+    "category": "SNS",
+    "set": "basic"
+  },
+  {
+    "id": 43,
+    "fuda": "3選",
+    "yomi": "俺が開発をする理由3選",
+    "image": "/images/3選.png",
+    "category": "SNS",
+    "set": "basic"
+  },
+  {
+    "id": 44,
+    "fuda": "お前もう船降りろ",
+    "yomi": "お前、もう船降りろ",
+    "image": "/images/お前もう船降りろ.jpg",
+    "category": "漫画・アニメ",
+    "set": "basic"
+  },
+  {
+    "id": 45,
+    "fuda": "開発者俺だもん",
+    "yomi": "そいつの開発者俺だもん",
+    "image": "/images/そいつの開発者.jpg",
+    "category": "漫画・アニメ",
+    "set": "basic"
+  },
+  {
+    "id": 46,
+    "fuda": "大泉洋",
+    "yomi": "またしても何も知らない大泉洋",
+    "image": "/images/またしても何も知らない.jpg",
+    "category": "SNS",
+    "set": "basic"
+  },
+  {
+    "id": 47,
+    "fuda": "二郎",
+    "yomi": "(神田神保町店は)レベルの高い合格点を超える二郎オールウェイズ出してくれる",
+    "image": "/images/レベルの高い合格点を.jpg",
+    "category": "SNS",
+    "set": "basic"
+  },
+  {
+    "id": 48,
+    "fuda": "鱗滝",
+    "yomi": "判断が遅い",
+    "image": "/images/判断が遅い.jpg",
+    "category": "漫画・アニメ",
+    "set": "basic"
+  },
+  {
+    "id": 49,
+    "fuda": "粉バナナ",
+    "yomi": "粉バナナ",
+    "image": "/images/粉バナナ.png",
+    "category": "漫画・アニメ",
+    "set": "basic"
+  },
+  {
+    "id": 50,
+    "fuda": "容態急変",
+    "yomi": "容態急変FULL",
+    "image": "/images/容態急変FULL.png",
+    "category": "SNS",
+    "set": "basic"
   }
 ]
