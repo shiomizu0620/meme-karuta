@@ -14,6 +14,7 @@ defmodule Realtime.Room do
   def start_game(room_id, settings, cards), do: call(room_id, {:start_game, settings, cards}, {:error, "room not found"})
   def next_card(room_id), do: call(room_id, :next_card, {:error, "room not found"})
   def take_card(room_id, card_id, name), do: call(room_id, {:take_card, card_id, name}, {:error, "room not found"})
+  def attempt_take(room_id, card_id, name), do: call(room_id, {:attempt_take, card_id, name}, {:error, "room not found"})
 
   defp call(room_id, msg, fallback) do
     GenServer.call(via(room_id), msg)
@@ -25,7 +26,7 @@ defmodule Realtime.Room do
   def init(max_players) do
     {:ok, %{players: [], max_players: max_players, host: nil, status: :waiting,
             settings: nil, cards: [], current_card_idx: -1,
-            taken_card_ids: MapSet.new(), scores: %{}}}
+            taken_card_ids: MapSet.new(), scores: %{}, foul_players: MapSet.new(), card_resolved: false}}
   end
 
   @impl true
@@ -49,26 +50,51 @@ defmodule Realtime.Room do
   def handle_call(:get_settings, _from, s), do: {:reply, s.settings, s}
 
   def handle_call({:start_game, settings, cards}, _from, state) do
-    if state.status != :waiting do
-      {:reply, {:error, "game already started"}, state}
-    else
-      scores = Map.new(state.players, fn {_, n} -> {n, 0} end)
-      new_state = %{state | status: :playing, settings: settings, cards: cards,
-                            current_card_idx: 0, taken_card_ids: MapSet.new(), scores: scores}
-      broadcast(state.players, %{type: "game_started", cards: cards, settings: settings,
-                                  players: Enum.map(state.players, fn {_, n} -> n end)})
-      broadcast_card_reading(state.players, cards, 0)
-      schedule_time_limit(settings)
-      {:reply, :ok, new_state}
+    cond do
+      state.status != :waiting ->
+        {:reply, {:error, "game already started"}, state}
+      length(state.players) < 2 ->
+        {:reply, {:error, "2人以上必要です"}, state}
+      true ->
+        scores = Map.new(state.players, fn {_, n} -> {n, 0} end)
+        new_state = %{state | status: :playing, settings: settings, cards: cards,
+                              current_card_idx: 0, taken_card_ids: MapSet.new(), scores: scores}
+        broadcast(state.players, %{type: "game_started", cards: cards, settings: settings,
+                                    players: Enum.map(state.players, fn {_, n} -> n end)})
+        broadcast_card_reading(state.players, cards, 0)
+        schedule_time_limit(settings)
+        {:reply, :ok, new_state}
     end
   end
 
   def handle_call(:next_card, _from, state) do
-    case find_next_card_idx(state) do
-      nil -> do_finish_game(state)
-      idx ->
-        broadcast_card_reading(state.players, state.cards, idx)
-        {:reply, :ok, %{state | current_card_idx: idx}}
+    if not state.card_resolved do
+      {:reply, {:error, "まだ札を取れます"}, state}
+    else
+      case find_next_card_idx(state) do
+        nil -> do_finish_game(state)
+        idx ->
+          broadcast_card_reading(state.players, state.cards, idx)
+          {:reply, :ok, %{state | current_card_idx: idx, foul_players: MapSet.new(), card_resolved: false}}
+      end
+    end
+  end
+
+  def handle_call({:attempt_take, card_id, name}, _from, state) do
+    cond do
+      state.status != :playing ->
+        {:reply, {:error, "game not in progress"}, state}
+      MapSet.member?(state.foul_players, name) ->
+        {:reply, {:error, :fouled}, state}
+      card_id != current_card_id(state) ->
+        new_scores = Map.update(state.scores, name, -1, &(&1 - 1))
+        new_foul = MapSet.put(state.foul_players, name)
+        all_fouled = MapSet.size(new_foul) >= length(state.players)
+        new_state = %{state | scores: new_scores, foul_players: new_foul, card_resolved: all_fouled}
+        broadcast(state.players, %{type: "foul", player: name, scores: new_scores, all_fouled: all_fouled})
+        {:reply, {:foul, new_scores}, new_state}
+      true ->
+        {:reply, :valid, state}
     end
   end
 
@@ -79,7 +105,7 @@ defmodule Realtime.Room do
       true ->
         new_taken = MapSet.put(state.taken_card_ids, card_id)
         new_scores = Map.update(state.scores, name, 1, &(&1 + 1))
-        new_state = %{state | taken_card_ids: new_taken, scores: new_scores}
+        new_state = %{state | taken_card_ids: new_taken, scores: new_scores, card_resolved: true}
         broadcast(state.players, %{type: "card_taken", card_id: card_id, winner: name, scores: new_scores})
         if end_condition_met?(new_state), do: do_finish_game(new_state), else: {:reply, {:ok, new_scores}, new_state}
     end
@@ -112,6 +138,14 @@ defmodule Realtime.Room do
   defp broadcast_card_reading(players, cards, idx) do
     broadcast(players, %{type: "card_reading", card: Enum.at(cards, idx), index: idx, total: length(cards)})
   end
+
+  defp current_card_id(%{cards: cards, current_card_idx: idx}) when idx >= 0 do
+    case Enum.at(cards, idx) do
+      %{"id" => id} -> id
+      _ -> nil
+    end
+  end
+  defp current_card_id(_), do: nil
 
   defp find_next_card_idx(state) do
     state.cards

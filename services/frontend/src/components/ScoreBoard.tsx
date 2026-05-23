@@ -4,9 +4,10 @@ import { EfudaCard } from "./EfudaCard";
 type Props = {
   room: RoomState;
   onPlayAgain: () => void;
+  onShowPokedex: () => void;
 };
 
-export function ScoreBoard({ room, onPlayAgain }: Props) {
+export function ScoreBoard({ room, onPlayAgain, onShowPokedex }: Props) {
   const { game, playerName } = room;
   if (!game) return null;
 
@@ -39,7 +40,10 @@ export function ScoreBoard({ room, onPlayAgain }: Props) {
             </div>
           </div>
         )}
-        <button type="button" className="scoreboard__again-btn" onClick={onPlayAgain}>ロビーに戻る</button>
+        <div className="scoreboard__actions">
+          <button type="button" className="scoreboard__pokedex-btn" onClick={onShowPokedex}>図鑑を見る</button>
+          <button type="button" className="scoreboard__again-btn" onClick={onPlayAgain}>ロビーに戻る</button>
+        </div>
       </div>
     </div>
   );

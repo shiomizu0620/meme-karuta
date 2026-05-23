@@ -6,15 +6,17 @@ export type LobbyResult =
 
 type Props = {
   onEnter: (result: LobbyResult) => void;
+  onShowPokedex: () => void;
+  savedPlayerName?: string;
   loading?: boolean;
   serverError?: string | null;
 };
 
 const ROOM_ID_PATTERN = /^[A-Z0-9]{4,8}$/;
 
-export function RoomLobby({ onEnter, loading = false, serverError = null }: Props) {
+export function RoomLobby({ onEnter, onShowPokedex, savedPlayerName = "", loading = false, serverError = null }: Props) {
   const [tab, setTab] = useState<"create" | "join">("create");
-  const [playerName, setPlayerName] = useState("");
+  const [playerName, setPlayerName] = useState(savedPlayerName);
   const [roomId, setRoomId] = useState("");
   const [validationError, setValidationError] = useState<string | null>(null);
 
@@ -44,7 +46,12 @@ export function RoomLobby({ onEnter, loading = false, serverError = null }: Prop
   return (
     <div className="lobby">
       <div className="lobby__card">
-        <h1 className="lobby__title">ネットミームカルタ</h1>
+        <div className="lobby__title-row">
+          <h1 className="lobby__title">ネットミームカルタ</h1>
+          <button type="button" className="lobby__pokedex-btn" onClick={onShowPokedex} title="図鑑を見る">
+            図鑑
+          </button>
+        </div>
         <p className="lobby__subtitle">最大8人で遊べるリアルタイムカルタ</p>
         <div className="lobby__tabs" role="tablist">
           <button type="button" role="tab" aria-selected={tab === "create"} className={`lobby__tab ${tab === "create" ? "lobby__tab--active" : ""}`} onClick={() => setTab("create")} disabled={loading}>ルームを作る</button>

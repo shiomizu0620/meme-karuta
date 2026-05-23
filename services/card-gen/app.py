@@ -11,7 +11,9 @@ from urllib.parse import parse_qs, urlparse
 from generate import (
     CARDS,
     CATEGORIES,
+    SETS,
     filter_by_category,
+    filter_by_sets,
     get_category_stats,
     search_cards,
     validate_card,
@@ -50,6 +52,9 @@ class CardHandler(BaseHTTPRequestHandler):
         elif path.startswith("/cards/"):
             self._handle_get_card(path)
 
+        elif path == "/sets":
+            self._json(200, {"sets": SETS})
+
         elif path == "/categories":
             self._json(200, {
                 "categories": CATEGORIES,
@@ -80,12 +85,18 @@ class CardHandler(BaseHTTPRequestHandler):
     # ---- ルートハンドラ実装 ----
 
     def _handle_list_cards(self, params: dict[str, list[str]]) -> None:
-        category = _first(params, "category")
-        query    = _first(params, "q")
-        limit    = _first_int(params, "limit")
-        offset   = _first_int(params, "offset", default=0)
+        category  = _first(params, "category")
+        query     = _first(params, "q")
+        limit     = _first_int(params, "limit")
+        offset    = _first_int(params, "offset", default=0)
+        sets_param = _first(params, "sets")
 
         cards: list[dict] = list(CARDS)
+
+        if sets_param:
+            set_ids = [s.strip() for s in sets_param.split(",") if s.strip()]
+            if set_ids:
+                cards = filter_by_sets(cards, set_ids)  # type: ignore[arg-type]
 
         if category:
             if category not in CATEGORIES:

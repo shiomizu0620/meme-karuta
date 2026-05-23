@@ -20,12 +20,14 @@ services:
       JUDGE_URL: http://judge:5002
       QUEUE_URL: http://queue:5003
       SERIALIZER_URL: http://serializer:5004
+      POKEDEX_URL: http://pokedex:5005
     depends_on:
       - card-gen
       - shuffle
       - judge
       - queue
       - serializer
+      - pokedex
 
   judge:
     build: ./services/judge
@@ -41,6 +43,8 @@ services:
     build: ./services/card-gen
     ports:
       - "5000:5000"
+    volumes:
+      - ./services/card-gen/data:/app/data:ro
 
   shuffle:
     build: ./services/shuffle
@@ -57,7 +61,17 @@ services:
     ports:
       - "5004:5004"
 
+  pokedex:
+    build: ./services/pokedex
+    ports:
+      - "5005:5005"
+    volumes:
+      - pokedex_data:/data
+
   tasks:
     build: ./services/tasks
     profiles:
       - tools
+
+volumes:
+  pokedex_data:

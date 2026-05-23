@@ -1,5 +1,7 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { GameSettings } from "../hooks/useGame";
+
+type SetInfo = { id: string; name: string; description: string };
 
 type Props = {
   roomId: string;
@@ -10,12 +12,30 @@ type Props = {
   onStartGame: (settings: GameSettings) => void;
 };
 
+const GATEWAY_URL =
+  (import.meta as unknown as { env: Record<string, string> }).env
+    .VITE_GATEWAY_URL ?? "http://localhost:8080";
+
+const DEFAULT_SET_IDS = ["basic", "sns", "emotion"];
+
 export function WaitingRoom({ roomId, players, isHost, playerName, onLeave, onStartGame }: Props) {
   const [copied, setCopied] = useState(false);
   const [yomiteMode, setYomiteMode] = useState<"ai" | "player">("ai");
   const [yomiteName, setYomiteName] = useState(playerName);
   const [endMode, setEndMode] = useState<"count" | "time">("count");
   const [endValue, setEndValue] = useState(5);
+  const [availableSets, setAvailableSets] = useState<SetInfo[]>([]);
+  const [selectedSets, setSelectedSets] = useState<string[]>(DEFAULT_SET_IDS);
+
+  useEffect(() => {
+    if (!isHost) return;
+    fetch(`${GATEWAY_URL}/api/cards/sets`)
+      .then((r) => r.json())
+      .then((data) => {
+        if (Array.isArray(data.sets)) setAvailableSets(data.sets);
+      })
+      .catch(() => {});
+  }, [isHost]);
 
   const copyRoomId = () => {
     navigator.clipboard.writeText(roomId).then(() => {
@@ -24,12 +44,19 @@ export function WaitingRoom({ roomId, players, isHost, playerName, onLeave, onSt
     });
   };
 
+  const toggleSet = (id: string) => {
+    setSelectedSets((prev) =>
+      prev.includes(id) ? prev.filter((s) => s !== id) : [...prev, id]
+    );
+  };
+
   const handleStart = () => {
     onStartGame({
       yomite_mode: yomiteMode,
       yomite_name: yomiteMode === "player" ? yomiteName : playerName,
       end_mode: endMode,
       end_value: endValue,
+      selected_sets: selectedSets,
     });
   };
 
@@ -61,6 +88,29 @@ export function WaitingRoom({ roomId, players, isHost, playerName, onLeave, onSt
         {isHost ? (
           <div className="waiting__settings">
             <p className="waiting__section-title">ゲーム設定</p>
+
+            {availableSets.length > 0 && (
+              <div className="waiting__settings-field">
+                <span>カードセット（複数選択可）</span>
+                <div className="waiting__set-list">
+                  {availableSets.map((s) => (
+                    <label key={s.id} className={`waiting__set-item ${selectedSets.includes(s.id) ? "waiting__set-item--selected" : ""}`}>
+                      <input
+                        type="checkbox"
+                        checked={selectedSets.includes(s.id)}
+                        onChange={() => toggleSet(s.id)}
+                      />
+                      <span className="waiting__set-name">{s.name}</span>
+                      <span className="waiting__set-desc">{s.description}</span>
+                    </label>
+                  ))}
+                </div>
+                {selectedSets.length === 0 && (
+                  <p className="waiting__set-warn">少なくとも1つのセットを選んでください</p>
+                )}
+              </div>
+            )}
+
             <label className="waiting__settings-field">
               <span>よみてモード</span>
               <div className="waiting__radio-group">
@@ -87,7 +137,8 @@ export function WaitingRoom({ roomId, players, isHost, playerName, onLeave, onSt
               <span>{endMode === "count" ? "取る枚数" : "制限時間（秒）"}</span>
               <input type="number" className="waiting__number-input" min={endMode === "count" ? 1 : 10} max={endMode === "count" ? 10 : 300} value={endValue} onChange={(e) => setEndValue(Number(e.target.value))} />
             </label>
-            <button type="button" className="waiting__start-btn" onClick={handleStart} disabled={players.length < 1}>ゲームスタート</button>
+            {players.length < 2 && <p className="waiting__set-warn">あと{2 - players.length}人の参加が必要です</p>}
+            <button type="button" className="waiting__start-btn" onClick={handleStart} disabled={players.length < 2 || selectedSets.length === 0}>ゲームスタート</button>
           </div>
         ) : (
           <p className="waiting__status">ホストがゲームを開始するまでお待ちください</p>

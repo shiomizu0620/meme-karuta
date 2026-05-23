@@ -1,0 +1,65 @@
+set:
+  id: sns
+  name: SNSミーム
+  description: SNSでよく見るミーム10枚
+
+cards:
+  - id: 11
+    fuda: なんでやねん
+    yomi: 理由もなく突然理不尽なことが起きて困惑したとき
+    image: nandeyanen.jpg
+    category: ツッコミ
+
+  - id: 12
+    fuda: ほんこれ
+    yomi: 誰かの意見が自分の気持ちを完璧に代弁してくれたとき
+    image: honkore.jpg
+    category: 共感
+
+  - id: 13
+    fuda: 尊い
+    yomi: 圧倒的な可愛さや美しさに心が浄化される瞬間
+    image: toutoi.jpg
+    category: 褒め
+
+  - id: 14
+    fuda: は？待って
+    yomi: 情報の処理が追いつかずフリーズしたとき
+    image: hamatte.jpg
+    category: 反応
+
+  - id: 15
+    fuda: 終わった
+    yomi: 修正不可能なミスをしたと気づいた瞬間
+    image: owatta.jpg
+    category: 絶望
+
+  - id: 16
+    fuda: 正論すぎる
+    yomi: 反論の余地がない事実を突きつけられて黙るしかないとき
+    image: seironsugiru.jpg
+    category: 共感
+
+  - id: 17
+    fuda: ぴえん
+    yomi: 小さな悲しみや失望が重なって涙が出そうになるとき
+    image: pien.jpg
+    category: 感情
+
+  - id: 18
+    fuda: エモい
+    yomi: 懐かしさや切なさが混ざった感情が突然込み上げてきたとき
+    image: emoi.jpg
+    category: 感情
+
+  - id: 19
+    fuda: 待って笑う
+    yomi: 笑ってはいけない場面で笑いが止まらなくなったとき
+    image: mattewarau.jpg
+    category: 笑い
+
+  - id: 20
+    fuda: なんも言えねぇ
+    yomi: あまりにも衝撃的な出来事に言葉を失ったとき
+    image: nanmoienee.jpg
+    category: 絶望
