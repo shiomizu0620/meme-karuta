@@ -6,12 +6,11 @@ import Data.Aeson (FromJSON, ToJSON, decode, encode, object, parseJSON, withObje
 import Data.IORef (IORef, atomicModifyIORef', newIORef, readIORef)
 import Data.List (group, nub, sort)
 import Data.Maybe (fromMaybe)
-import qualified Data.ByteString.Lazy as LBS
 import qualified Data.Map.Strict as Map
 import qualified Data.Vector as V
 import qualified Data.Vector.Mutable as MV
 import Network.HTTP.Types
-  ( Status, hContentType, methodGet, methodOptions, methodPost
+  ( Status, hContentType, methodGet, methodPost
   , status200, status400, status404, status405, status500
   )
 import Network.Wai (Request, Response, lazyRequestBody, rawPathInfo, requestMethod, responseLBS)
@@ -118,21 +117,8 @@ computeStats vec =
 jsonResponse :: (ToJSON a) => Status -> a -> Response
 jsonResponse status body =
   responseLBS status
-    [ (hContentType, "application/json; charset=utf-8")
-    , ("Access-Control-Allow-Origin",  "*")
-    , ("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
-    , ("Access-Control-Allow-Headers", "Content-Type")
-    ]
+    [ (hContentType, "application/json; charset=utf-8") ]
     (encode body)
-
-corsPreflightResponse :: Response
-corsPreflightResponse =
-  responseLBS status200
-    [ ("Access-Control-Allow-Origin",  "*")
-    , ("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
-    , ("Access-Control-Allow-Headers", "Content-Type")
-    ]
-    LBS.empty
 
 errorResponse :: Status -> String -> Response
 errorResponse s msg = jsonResponse s (object ["error" .= msg])
@@ -142,9 +128,6 @@ errorResponse s msg = jsonResponse s (object ["error" .= msg])
 handleRequest :: Request -> IO Response
 handleRequest req =
   case (requestMethod req, rawPathInfo req) of
-
-    (m, _) | m == methodOptions ->
-      return corsPreflightResponse
 
     (m, "/health") | m == methodGet ->
       return $ jsonResponse status200 (object

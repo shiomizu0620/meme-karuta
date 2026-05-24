@@ -269,7 +269,6 @@ class QueueHttpServer(
     out.print(s"HTTP/1.1 $status $statusText\r\n")
     out.print("Content-Type: application/json; charset=utf-8\r\n")
     out.print(s"Content-Length: ${body.getBytes("UTF-8").length}\r\n")
-    out.print("Access-Control-Allow-Origin: *\r\n")
     out.print("\r\n")
     out.print(body)
     out.flush()
