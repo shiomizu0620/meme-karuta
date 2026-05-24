@@ -100,7 +100,49 @@ cards:
     image: もりら.png
     category: SNS
 
-  - id: 66
+  - id: 69
+    fuda: 星野源
+    yomi: たまに重なり、会うような
+    image: 星野源.png
+    category: SNS
+
+  - id: 70
+    fuda: 野獣
+    yomi: やりますねえ
+    image: 野獣.png
+    category: SNS
+
+  - id: 71
+    fuda: レモン
+    yomi: そこのお前! レモン1個に含まれるビタミンCはレモン1個分だぜ
+    image: レモン.png
+    category: SNS
+
+  - id: 72
+    fuda: ワッカ
+    yomi: ティーダの
+    image: ワッカ.png
+    category: SNS
+
+  - id: 73
+    fuda: 寺田心
+    yomi: 今、こう思いましたね
+    image: 寺田心.png
+    category: SNS
+
+  - id: 74
+    fuda: 野原ひろし
+    yomi: しんのすけ、今日から「いただきます」を禁止する
+    image: みさえ.png
+    category: SNS
+
+  - id: 81
+    fuda: 若者を
+    yomi: 若者をいじめて楽しいか
+    image: 若者.png
+    category: SNS
+
+  - id: 82
     fuda: バジリスク
     yomi: バジリスクタイム
     image: バジリスク.png

@@ -160,25 +160,31 @@ cards:
     image: なぜおれは.jpg
     category: 漫画・アニメ
 
-  - id: 64
+  - id: 67
+    fuda: 青酸カリ
+    yomi: ぺろ、これは
+    image: コナン.png
+    category: 漫画・アニメ
+
+  - id: 85
     fuda: ワザップジョルノ
     yomi: あなたを詐欺罪と器物損壊罪で訴えます！理由はもちろんお分かりですね？
     image: ワザップジョルノ.png
     category: 漫画・アニメ
 
-  - id: 67
+  - id: 86
     fuda: 溺れ死ぬボーちゃん
     yomi: この川！深い！！！
     image: ボー.png
     category: 漫画・アニメ
 
-  - id: 68
+  - id: 87
     fuda: 止まるんじゃねえぞ
     yomi: 止まるんじゃねえぞ
     image: 止まるんじゃ.png
     category: 漫画・アニメ
 
-  - id: 69
+  - id: 88
     fuda: もうこないからねー
     yomi: もうこないからねー
     image: もうこない.jpg
