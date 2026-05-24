@@ -15,4 +15,4 @@ executable shuffle
     , warp       >= 3.3
     , http-types >= 0.12
     , containers >= 0.6
-  ghc-options: -O2 -Wall
+  ghc-options: -O2 -Wall -threaded -rtsopts -with-rtsopts=-N
