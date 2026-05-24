@@ -372,7 +372,6 @@ static void http_response(int fd, int status, const char *body, size_t body_len)
         "HTTP/1.1 %d %s\r\n"
         "Content-Type: application/json; charset=utf-8\r\n"
         "Content-Length: %zu\r\n"
-        "Access-Control-Allow-Origin: *\r\n"
         "Connection: close\r\n"
         "\r\n",
         status, status_text, body_len);
@@ -474,7 +473,7 @@ static void handle_connection(int client_fd, const Card *cards, uint32_t count) 
             char header[256];
             snprintf(header, sizeof(header),
                 "HTTP/1.1 200 OK\r\nContent-Type: application/octet-stream\r\n"
-                "Content-Length: %zu\r\nAccess-Control-Allow-Origin: *\r\nConnection: close\r\n\r\n",
+                "Content-Length: %zu\r\nConnection: close\r\n\r\n",
                 written);
             send_all(client_fd, header, strlen(header));
             send_all(client_fd, (const char *)binary, written);

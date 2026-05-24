@@ -22,7 +22,7 @@ const GATEWAY_URL =
   (import.meta as unknown as { env: Record<string, string> }).env
     .VITE_GATEWAY_URL ?? "http://localhost:8080";
 
-const DEFAULT_SET_IDS = ["basic", "sns", "tv", "anime_manga"];
+const DEFAULT_SET_ID = "basic";
 
 export function WaitingRoom({ roomId, players, isHost, playerName, customCards, onLeave, onStartGame, onAddCustomCard, onRemoveCustomCard, errorMsg }: Props) {
   const [copied, setCopied] = useState(false);
@@ -31,7 +31,7 @@ export function WaitingRoom({ roomId, players, isHost, playerName, customCards, 
   const [endMode, setEndMode] = useState<"count" | "time">("count");
   const [endValue, setEndValue] = useState(5);
   const [availableSets, setAvailableSets] = useState<SetInfo[]>([]);
-  const [selectedSets, setSelectedSets] = useState<string[]>(DEFAULT_SET_IDS);
+  const [selectedSet, setSelectedSet] = useState<string>(DEFAULT_SET_ID);
 
   useEffect(() => {
     if (!isHost) return;
@@ -43,7 +43,7 @@ export function WaitingRoom({ roomId, players, isHost, playerName, customCards, 
       .catch(() => {});
   }, [isHost]);
 
-  const hasContent = selectedSets.length > 0 || customCards.length > 0;
+  const hasContent = selectedSet !== "" || customCards.length > 0;
 
   const copyRoomId = () => {
     navigator.clipboard.writeText(roomId).then(() => {
@@ -52,11 +52,7 @@ export function WaitingRoom({ roomId, players, isHost, playerName, customCards, 
     });
   };
 
-  const toggleSet = (id: string) => {
-    setSelectedSets((prev) =>
-      prev.includes(id) ? prev.filter((s) => s !== id) : [...prev, id]
-    );
-  };
+  const selectSet = (id: string) => setSelectedSet(id);
 
   const handleStart = () => {
     onStartGame({
@@ -64,7 +60,7 @@ export function WaitingRoom({ roomId, players, isHost, playerName, customCards, 
       yomite_name: yomiteMode === "player" ? yomiteName : playerName,
       end_mode: endMode,
       end_value: endValue,
-      selected_sets: selectedSets,
+      selected_sets: [selectedSet],
     });
   };
 
@@ -110,14 +106,15 @@ export function WaitingRoom({ roomId, players, isHost, playerName, customCards, 
 
             {availableSets.length > 0 && (
               <div className="waiting__settings-field">
-                <span>カードセット（複数選択可）</span>
+                <span>カードセット</span>
                 <div className="waiting__set-list">
                   {availableSets.map((s) => (
-                    <label key={s.id} className={`waiting__set-item ${selectedSets.includes(s.id) ? "waiting__set-item--selected" : ""}`}>
+                    <label key={s.id} className={`waiting__set-item ${selectedSet === s.id ? "waiting__set-item--selected" : ""}`}>
                       <input
-                        type="checkbox"
-                        checked={selectedSets.includes(s.id)}
-                        onChange={() => toggleSet(s.id)}
+                        type="radio"
+                        name="card-set"
+                        checked={selectedSet === s.id}
+                        onChange={() => selectSet(s.id)}
                       />
                       <span className="waiting__set-name">{s.name}</span>
                       <span className="waiting__set-desc">{s.description}</span>
