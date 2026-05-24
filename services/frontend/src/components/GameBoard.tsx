@@ -1,6 +1,20 @@
-import { useEffect, useRef } from "react";
-import type { RoomState } from "../hooks/useGame";
+import { useEffect, useMemo, useRef } from "react";
+import type { Card, RoomState } from "../hooks/useGame";
 import { EfudaCard } from "./EfudaCard";
+
+function shuffleForDisplay(cards: Card[]): Card[] {
+  let seed = cards.reduce((acc, c) => acc + c.id * 2654435761, 0) >>> 0;
+  const rng = () => {
+    seed = (seed * 1664525 + 1013904223) >>> 0;
+    return seed / 0x100000000;
+  };
+  const arr = [...cards];
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(rng() * (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+  return arr;
+}
 
 type Props = {
   room: RoomState;
@@ -16,6 +30,7 @@ export function GameBoard({ room, onTakeCard, onNextCard, isFouled, cardResolved
 
   const isAiMode = game?.settings.yomite_mode === "ai";
   const currentCard = game?.currentCard ?? null;
+  const displayCards = useMemo(() => shuffleForDisplay(game?.cards ?? []), [game?.cards]);
 
   useEffect(() => {
     if (!isAiMode || !currentCard) return;
@@ -31,8 +46,8 @@ export function GameBoard({ room, onTakeCard, onNextCard, isFouled, cardResolved
 
   const { cards, settings, takenCardIds, scores } = game;
   const isYomite = isAiMode || settings.yomite_name === playerName;
-  const remainingCards = cards.filter((c) => !takenCardIds.has(c.id));
-  const takenCards = cards.filter((c) => takenCardIds.has(c.id));
+  const remainingCards = displayCards.filter((c) => !takenCardIds.has(c.id));
+  const takenCards = displayCards.filter((c) => takenCardIds.has(c.id));
   const totalTaken = takenCardIds.size;
   const totalCards = cards.length;
 
@@ -43,13 +58,15 @@ export function GameBoard({ room, onTakeCard, onNextCard, isFouled, cardResolved
           {currentCard ? (
             <>
               {isYomite && !isAiMode ? (
-                <p className="board__yomi">{currentCard.yomi}</p>
+                <>
+                  <p className="board__yomi">{currentCard.yomi}</p>
+                  <p className="board__fuda-hint">{currentCard.fuda}</p>
+                </>
               ) : isAiMode ? (
                 <p className="board__yomi board__yomi--ai">🔊 {currentCard.yomi}</p>
               ) : (
                 <p className="board__yomi board__yomi--hidden">よみてが読み上げ中…</p>
               )}
-              <p className="board__fuda-hint">{currentCard.fuda}</p>
             </>
           ) : (
             <p className="board__yomi board__yomi--hidden">準備中…</p>
