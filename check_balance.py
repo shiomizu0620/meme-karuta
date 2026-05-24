@@ -1,7 +1,11 @@
 #!/usr/bin/env python3
-"""services/ 配下の各サービスのコード行数を言語ごとに集計し、バランスをレポートする。"""
+"""services/ 配下の各サービスのコードを言語ごとに集計し、バランスをレポートする。
+
+デフォルトは「実装行数」基準。`--bytes` で GitHub Linguist と同じ「バイト数」基準に切り替え。
+"""
 from __future__ import annotations
 
+import argparse
 import os
 import sys
 from dataclasses import dataclass
@@ -101,7 +105,14 @@ def _is_only_comment(text: str, spec: LangSpec) -> bool:
     return any(t.startswith(lc) for lc in spec.line_comment)
 
 
-def collect_counts() -> dict[str, int]:
+def count_bytes(path: Path, _spec: LangSpec) -> int:
+    try:
+        return path.stat().st_size
+    except OSError:
+        return 0
+
+
+def collect_counts(measure=count_lines) -> dict[str, int]:
     totals: dict[str, int] = {lang.name: 0 for lang in LANGUAGES}
     ext_map: dict[str, LangSpec] = {ext: lang for lang in LANGUAGES for ext in lang.extensions}
 
@@ -117,11 +128,11 @@ def collect_counts() -> dict[str, int]:
             spec = ext_map.get(ext)
             if spec is None:
                 continue
-            totals[spec.name] += count_lines(Path(root) / name, spec)
+            totals[spec.name] += measure(Path(root) / name, spec)
     return totals
 
 
-def render(totals: dict[str, int]) -> int:
+def render(totals: dict[str, int], unit: str = "行") -> int:
     bar = "=" * 40
     print(bar)
     print("  言語バランスチェック")
@@ -152,11 +163,11 @@ def render(totals: dict[str, int]) -> int:
         share = (count / total * 100) if total else 0.0
         bar_len = int(round(count / max_count * BAR_MAX_WIDTH)) if max_count else 0
         warn = "  ⚠️ 要調整" if lang.name in flagged else ""
-        print(f"{(lang.name + ':').ljust(name_width)} {count:>4}行 {'█' * bar_len:<{BAR_MAX_WIDTH}} {share:>4.1f}%{warn}")
+        print(f"{(lang.name + ':').ljust(name_width)} {count:>6}{unit} {'█' * bar_len:<{BAR_MAX_WIDTH}} {share:>4.1f}%{warn}")
 
     print(bar)
     if nonzero:
-        msg = f"最大差: {hi - lo}行 ({diff_pct:.1f}%)"
+        msg = f"最大差: {hi - lo}{unit} ({diff_pct:.1f}%)"
         if diff_pct >= THRESHOLD_PERCENT:
             msg += f" - 基準値{THRESHOLD_PERCENT:.0f}%を超えています"
         else:
@@ -170,7 +181,16 @@ def render(totals: dict[str, int]) -> int:
 
 
 def main() -> int:
-    return render(collect_counts())
+    parser = argparse.ArgumentParser(description="サービスごとのコード量を言語別に集計")
+    parser.add_argument(
+        "--bytes",
+        action="store_true",
+        help="GitHub Linguist と同じバイト数基準で集計（既定は実装行数）",
+    )
+    args = parser.parse_args()
+    if args.bytes:
+        return render(collect_counts(count_bytes), unit="B")
+    return render(collect_counts(count_lines), unit="行")
 
 
 if __name__ == "__main__":

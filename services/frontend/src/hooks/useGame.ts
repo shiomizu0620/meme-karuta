@@ -80,9 +80,7 @@ export function useGame() {
       const winner = String(msg.winner ?? "");
       setCardResolved(true);
       setRoom((p) => p?.game ? { ...p, game: { ...p.game, takenCardIds: new Set([...p.game.takenCardIds, cardId]), scores: msg.scores as Record<string, number> } } : p);
-      if (winner && winner === playerNameRef.current) {
-        recordCollected(winner, cardId);
-      }
+      if (winner && winner === playerNameRef.current) recordCollected(winner, cardId);
     } else if (t === "game_over") {
       setRoom((p) => p?.game ? { ...p, game: { ...p.game, scores: msg.scores as Record<string, number> } } : p);
       setPhase("finished");

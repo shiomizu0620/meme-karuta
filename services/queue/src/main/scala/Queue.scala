@@ -368,6 +368,92 @@ class RoomHistoryLimit(maxEventsPerRoom: Int = 5000) {
   def snapshot: Map[String, Int] = counts.toMap
 }
 
+// ---- ファイル永続化（JSONL 追記） ----
+// プロセス再起動後にイベント履歴を復元できるよう、各イベントを 1 行 JSON で追記する。
+// 失敗時は標準エラーへ警告のみ出して握りつぶす（キュー処理本体は止めない）。
+class FileEventPersister(filePath: String) {
+  import java.io.{BufferedWriter, File, FileWriter, PrintWriter, FileReader, BufferedReader}
+
+  private val lock = new Object
+  private val file = new File(filePath)
+  Option(file.getParentFile).foreach(_.mkdirs())
+
+  def append(event: GameEvent): Unit = lock.synchronized {
+    Try {
+      val map  = EventSerializer.toMap(event)
+      val line = JsonLine.encode(map)
+      val w    = new BufferedWriter(new FileWriter(file, true))
+      try {
+        w.write(line)
+        w.newLine()
+      } finally w.close()
+    }.recover { case e =>
+      System.err.println(s"[Persister] WARN: append failed: ${e.getMessage}")
+    }
+  }
+
+  // 起動時にスナップショットだけ返す（イベント再生は永続化フォーマット次第なので件数のみ）。
+  def loadCount(): Int = lock.synchronized {
+    if (!file.exists()) return 0
+    Try {
+      val r = new BufferedReader(new FileReader(file))
+      try {
+        var n = 0
+        var line: String = r.readLine()
+        while (line != null) {
+          if (line.trim.nonEmpty) n += 1
+          line = r.readLine()
+        }
+        n
+      } finally r.close()
+    }.getOrElse(0)
+  }
+
+  def truncate(): Unit = lock.synchronized {
+    Try {
+      val w = new PrintWriter(file)
+      try w.write("") finally w.close()
+    }
+  }
+
+  def filePathString: String = file.getAbsolutePath
+}
+
+// ---- スナップショット管理 ----
+// 直近のイベントカウントを定期的にスナップショットとして記録し、外部監視や
+// Replay 起点として参照できるようにする。
+class SnapshotManager(storage: EventStorage) {
+  private val snapshots = new TrieMap[String, EventSnapshot]()
+
+  def capture(roomId: String): EventSnapshot = {
+    val events = storage.findByRoom(roomId)
+    val lastId = events.lastOption.map(_.eventId).getOrElse("")
+    val snap = EventSnapshot(
+      roomId      = roomId,
+      eventCount  = events.size,
+      lastEventId = lastId,
+    )
+    snapshots.update(roomId, snap)
+    snap
+  }
+
+  def latest(roomId: String): Option[EventSnapshot] = snapshots.get(roomId)
+
+  def all: Map[String, EventSnapshot] = snapshots.toMap
+
+  def replay(roomId: String, fromEventId: String): EventReplay = {
+    val events = storage.findByRoom(roomId)
+    val idx    = events.indexWhere(_.eventId == fromEventId)
+    val slice  = if (idx >= 0) events.drop(idx) else events
+    EventReplay(
+      roomId      = roomId,
+      fromEventId = fromEventId,
+      toEventId   = slice.lastOption.map(_.eventId).getOrElse(fromEventId),
+      eventCount  = slice.size,
+    )
+  }
+}
+
 // ---- メインエントリポイント ----
 
 object Main extends App {
