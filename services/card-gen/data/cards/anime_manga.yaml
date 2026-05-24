@@ -166,12 +166,6 @@ cards:
     image: コナン.png
     category: 漫画・アニメ
 
-  - id: 68
-    fuda: 美味しんぼ
-    yomi: ぺろ、これは
-    image: コナン.png
-    category: 漫画・アニメ
-
   - id: 85
     fuda: ワザップジョルノ
     yomi: あなたを詐欺罪と器物損壊罪で訴えます！理由はもちろんお分かりですね？

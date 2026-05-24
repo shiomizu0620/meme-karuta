@@ -115,7 +115,7 @@ cards:
   - id: 71
     fuda: レモン
     yomi: そこのお前! レモン1個に含まれるビタミンCはレモン1個分だぜ
-    image: 野獣.png
+    image: レモン.png
     category: SNS
 
   - id: 72
@@ -131,8 +131,8 @@ cards:
     category: SNS
 
   - id: 74
-    fuda: しんのすけ、今日から「いただきます」を禁止する
-    yomi: 野原ひろし
+    fuda: 野原ひろし
+    yomi: しんのすけ、今日から「いただきます」を禁止する
     image: みさえ.png
     category: SNS
 
