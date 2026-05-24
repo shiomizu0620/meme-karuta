@@ -52,8 +52,62 @@ cards:
     image: 細胞は.png
     category: SNS
 
-  - id: 61
+  - id: 63
     fuda: 爆〇
     yomi: これ言っていいのかな
     image: これいって.png
+    category: テレビ
+
+  - id: 64
+    fuda: ちなみにご自身は
+    yomi: バキバキ童貞です
+    image: バキ童.png
+    category: テレビ
+
+  - id: 65
+    fuda: 極めてなにか
+    yomi: 生命に対する侮辱を感じます
+    image: 生命に対する侮辱.png
+    category: テレビ
+
+  - id: 66
+    fuda: 壁を破棄する音
+    yomi: ベルトルト
+    image: ベルトルト.jpg
+    category: テレビ
+
+  - id: 75
+    fuda: デュエル スタンバイ!
+    yomi: 城之内 死す
+    image: 城之内.png
+    category: テレビ
+
+  - id: 76
+    fuda: 地面師たち
+    yomi: もう、ええでしょう
+    image: もうええでしょう.png
+    category: テレビ
+
+  - id: 77
+    fuda: 地面師たち2
+    yomi: 島崎健一です
+    image: 島崎健一です.png
+    category: テレビ
+
+  - id: 78
+    fuda: 地面師たち3
+    yomi: いいなー地面師
+    image: いいなー地面師.png
+    category: テレビ
+
+  - id: 79
+    fuda: 兄弟、
+    yomi: 別れの言葉は無しか
+    image: 別れの言葉は無しか.png
+    category: テレビ
+
+  - id: 80
+    fuda: フロントガラス、破壊男
+    yomi: 木崎たかし
+    image: 木崎たかし.png
     category: テレビ

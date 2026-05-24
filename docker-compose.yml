@@ -42,7 +42,7 @@ services:
   card-gen:
     build: ./services/card-gen
     ports:
-      - "5000:5000"
+      - "5010:5000"
     volumes:
       - ./services/card-gen/data:/app/data:ro
 

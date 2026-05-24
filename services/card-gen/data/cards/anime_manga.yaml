@@ -159,3 +159,15 @@ cards:
     yomi: 何故俺は苛立っている...？
     image: なぜおれは.jpg
     category: 漫画・アニメ
+
+  - id: 67
+    fuda: 青酸カリ
+    yomi: ぺろ、これは
+    image: コナン.png
+    category: 漫画・アニメ
+
+  - id: 68
+    fuda: 美味しんぼ
+    yomi: ぺろ、これは
+    image: コナン.png
+    category: 漫画・アニメ
