@@ -94,8 +94,14 @@ cards:
     image: ぺこーら.png
     category: SNS
 
-  - id: 61
+  - id: 62
     fuda: 森羅万象
     yomi: もりらばんぞう
     image: もりら.png
+    category: SNS
+
+  - id: 66
+    fuda: バジリスク
+    yomi: バジリスクタイム
+    image: バジリスク.png
     category: SNS

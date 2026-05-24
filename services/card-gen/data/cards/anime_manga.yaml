@@ -159,3 +159,27 @@ cards:
     yomi: 何故俺は苛立っている...？
     image: なぜおれは.jpg
     category: 漫画・アニメ
+
+  - id: 64
+    fuda: ワザップジョルノ
+    yomi: あなたを詐欺罪と器物損壊罪で訴えます！理由はもちろんお分かりですね？
+    image: ワザップジョルノ.png
+    category: 漫画・アニメ
+
+  - id: 67
+    fuda: 溺れ死ぬボーちゃん
+    yomi: この川！深い！！！
+    image: ボー.png
+    category: 漫画・アニメ
+
+  - id: 68
+    fuda: 止まるんじゃねえぞ
+    yomi: 止まるんじゃねえぞ
+    image: 止まるんじゃ.png
+    category: 漫画・アニメ
+
+  - id: 69
+    fuda: もうこないからねー
+    yomi: もうこないからねー
+    image: もうこない.jpg
+    category: 漫画・アニメ

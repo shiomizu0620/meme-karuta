@@ -907,8 +907,29 @@ body {
   color: var(--text);
 }
 
-.board__yomi--ai { color: #0055cc; }
 .board__yomi--hidden { color: var(--text-dim); font-weight: 400; }
+
+.board__speak-btn {
+  appearance: none;
+  border: 2px solid var(--text);
+  background: #0055cc;
+  color: #ffffff;
+  padding: 12px 22px;
+  border-radius: 2px;
+  font-size: clamp(15px, 2vw, 18px);
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: 3px 3px 0 var(--text);
+  transition: transform 0.08s, box-shadow 0.08s;
+}
+.board__speak-btn:hover {
+  transform: translate(-1px, -1px);
+  box-shadow: 4px 4px 0 var(--text);
+}
+.board__speak-btn:active {
+  transform: translate(1px, 1px);
+  box-shadow: 1px 1px 0 var(--text);
+}
 
 .board__fuda-hint {
   margin: 4px 0 0;

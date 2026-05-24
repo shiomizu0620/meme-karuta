@@ -116,6 +116,20 @@ defmodule Realtime.SocketHandler do
     end
   end
 
+  defp dispatch(%{"type" => "speak_card"}, state) do
+    with {:ok, room_id} <- require_in_room(state),
+         settings = Realtime.Room.get_settings(room_id),
+         :ok <- require_ai_mode(settings),
+         :ok <- require_host(room_id, state.player_name) do
+      case Realtime.Room.speak_card(room_id) do
+        :ok -> {:ok, state}
+        {:error, reason} -> reply(error(reason), state)
+      end
+    else
+      {:error, reason} -> reply(error(reason), state)
+    end
+  end
+
   defp dispatch(%{"type" => "next_card"}, state) do
     with {:ok, room_id} <- require_in_room(state) do
       settings = Realtime.Room.get_settings(room_id)
@@ -225,6 +239,8 @@ defmodule Realtime.SocketHandler do
   defp require_in_room(%{room_id: nil}), do: {:error, "ルームに参加していません"}
   defp require_in_room(%{room_id: id}), do: {:ok, id}
   defp require_host(room_id, name), do: if(Realtime.Room.get_host(room_id) == name, do: :ok, else: {:error, "ホストのみこの操作ができます"})
+  defp require_ai_mode(%{"yomite_mode" => "ai"}), do: :ok
+  defp require_ai_mode(_), do: {:error, "AIモードでのみ使用できます"}
   defp player_mode?(%{"yomite_mode" => "player"}), do: true
   defp player_mode?(_), do: false
   defp validate_card_id(id) when is_integer(id), do: :ok

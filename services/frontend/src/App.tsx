@@ -26,7 +26,7 @@ export default function App() {
     return <WaitingRoom roomId={g.room.roomId} players={g.room.players} isHost={g.room.isHost} playerName={g.room.playerName} customCards={g.room.customCards} onLeave={g.leaveRoom} onStartGame={g.startGame} onAddCustomCard={g.addCustomCard} onRemoveCustomCard={g.removeCustomCard} errorMsg={g.errorMsg} />;
   }
   if (g.phase === "playing" && g.room) {
-    return <GameBoard room={g.room} onTakeCard={g.takeCard} onNextCard={g.nextCard} isFouled={g.isFouled} cardResolved={g.cardResolved} />;
+    return <GameBoard room={g.room} onTakeCard={g.takeCard} onNextCard={g.nextCard} onSpeakCard={g.speakCard} isFouled={g.isFouled} cardResolved={g.cardResolved} />;
   }
   if (g.phase === "finished" && g.room) {
     return <ScoreBoard room={g.room} onPlayAgain={g.leaveRoom} onShowPokedex={() => setShowPokedex(true)} />;
