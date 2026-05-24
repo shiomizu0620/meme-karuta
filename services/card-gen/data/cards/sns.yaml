@@ -94,16 +94,10 @@ cards:
     image: ぺこーら.png
     category: SNS
 
-  - id: 61
+  - id: 62
     fuda: 森羅万象
     yomi: もりらばんぞう
     image: もりら.png
-    category: SNS
-
-  - id: 62
-    fuda: 若者を
-    yomi: 若者をいじめて楽しいか
-    image: 若者.png
     category: SNS
 
   - id: 69
@@ -140,4 +134,16 @@ cards:
     fuda: しんのすけ、今日から「いただきます」を禁止する
     yomi: 野原ひろし
     image: みさえ.png
+    category: SNS
+
+  - id: 81
+    fuda: 若者を
+    yomi: 若者をいじめて楽しいか
+    image: 若者.png
+    category: SNS
+
+  - id: 82
+    fuda: バジリスク
+    yomi: バジリスクタイム
+    image: バジリスク.png
     category: SNS

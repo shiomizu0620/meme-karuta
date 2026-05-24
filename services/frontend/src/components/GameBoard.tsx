@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef } from "react";
+import { useMemo } from "react";
 import type { Card, RoomState } from "../hooks/useGame";
 import { EfudaCard } from "./EfudaCard";
 
@@ -20,27 +20,17 @@ type Props = {
   room: RoomState;
   onTakeCard: (cardId: number) => void;
   onNextCard: () => void;
+  onSpeakCard: () => void;
   isFouled: boolean;
   cardResolved: boolean;
 };
 
-export function GameBoard({ room, onTakeCard, onNextCard, isFouled, cardResolved }: Props) {
-  const { game, playerName } = room;
-  const utteranceRef = useRef<SpeechSynthesisUtterance | null>(null);
+export function GameBoard({ room, onTakeCard, onNextCard, onSpeakCard, isFouled, cardResolved }: Props) {
+  const { game, playerName, isHost } = room;
 
   const isAiMode = game?.settings.yomite_mode === "ai";
   const currentCard = game?.currentCard ?? null;
   const displayCards = useMemo(() => shuffleForDisplay(game?.cards ?? []), [game?.cards]);
-
-  useEffect(() => {
-    if (!isAiMode || !currentCard) return;
-    window.speechSynthesis.cancel();
-    const utter = new SpeechSynthesisUtterance(currentCard.yomi);
-    utter.lang = "ja-JP";
-    utteranceRef.current = utter;
-    window.speechSynthesis.speak(utter);
-    return () => { window.speechSynthesis.cancel(); };
-  }, [isAiMode, currentCard]);
 
   if (!game) return null;
 
@@ -62,8 +52,10 @@ export function GameBoard({ room, onTakeCard, onNextCard, isFouled, cardResolved
                   <p className="board__yomi">{currentCard.yomi}</p>
                   <p className="board__fuda-hint">{currentCard.fuda}</p>
                 </>
+              ) : isAiMode && isHost ? (
+                <button type="button" className="board__speak-btn" onClick={onSpeakCard}>🔊 読み上げる</button>
               ) : isAiMode ? (
-                <p className="board__yomi board__yomi--ai">🔊 {currentCard.yomi}</p>
+                <p className="board__yomi board__yomi--hidden">ホストの読み上げを待っています…</p>
               ) : (
                 <p className="board__yomi board__yomi--hidden">よみてが読み上げ中…</p>
               )}

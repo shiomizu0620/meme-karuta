@@ -111,3 +111,15 @@ cards:
     yomi: 木崎たかし
     image: 木崎たかし.png
     category: テレビ
+
+  - id: 83
+    fuda: 雪
+    yomi: 恋人といるときの雪ってなんか特別な気分に浸れて僕は好きです
+    image: 雪.png
+    category: テレビ
+
+  - id: 84
+    fuda: 熱盛
+    yomi: すみません、熱盛と出てしまいました
+    image: 熱盛.png
+    category: テレビ

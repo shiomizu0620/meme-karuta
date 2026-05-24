@@ -171,3 +171,27 @@ cards:
     yomi: ぺろ、これは
     image: コナン.png
     category: 漫画・アニメ
+
+  - id: 85
+    fuda: ワザップジョルノ
+    yomi: あなたを詐欺罪と器物損壊罪で訴えます！理由はもちろんお分かりですね？
+    image: ワザップジョルノ.png
+    category: 漫画・アニメ
+
+  - id: 86
+    fuda: 溺れ死ぬボーちゃん
+    yomi: この川！深い！！！
+    image: ボー.png
+    category: 漫画・アニメ
+
+  - id: 87
+    fuda: 止まるんじゃねえぞ
+    yomi: 止まるんじゃねえぞ
+    image: 止まるんじゃ.png
+    category: 漫画・アニメ
+
+  - id: 88
+    fuda: もうこないからねー
+    yomi: もうこないからねー
+    image: もうこない.jpg
+    category: 漫画・アニメ
