@@ -3,6 +3,7 @@ module Main (main) where
 
 import Control.Monad (forM_, replicateM, when)
 import Data.Aeson (FromJSON, ToJSON, decode, encode, object, parseJSON, withObject, (.=), (.:))
+import Data.IORef (IORef, atomicModifyIORef', newIORef, readIORef)
 import Data.List (group, nub, sort)
 import Data.Maybe (fromMaybe)
 import qualified Data.ByteString.Lazy as LBS
@@ -16,6 +17,7 @@ import Network.HTTP.Types
 import Network.Wai (Request, Response, lazyRequestBody, rawPathInfo, requestMethod, responseLBS)
 import Network.Wai.Handler.Warp (run)
 import System.Environment (lookupEnv)
+import System.IO.Unsafe (unsafePerformIO)
 import System.Random (RandomGen, mkStdGen, randomR, randomRIO, newStdGen)
 
 -- ---- 型定義 ----
@@ -149,6 +151,18 @@ handleRequest req =
         [ "status"           .= ("ok" :: String)
         , "max_shuffle_size" .= maxShuffleSize
         ])
+
+    (m, "/metrics") | m == methodGet ->
+      handleMetrics
+
+    (m, "/distribution") | m == methodPost ->
+      handleDistribution req
+
+    (m, "/partition") | m == methodPost ->
+      handlePartition req
+
+    (m, "/sample") | m == methodPost ->
+      handleSample req
 
     (m, "/shuffle") | m == methodPost ->
       handleShuffle req
@@ -492,6 +506,110 @@ isValidShuffleInput xs
   | any (< 0) xs                   = Left "input contains negative ids"
   | otherwise                      = Right (length xs)
 
+-- ---- メトリクス ----
+-- プロセス全体で 1 つだけ持つ累計カウンタ。unsafePerformIO は IORef 確保のみで純粋。
+
+{-# NOINLINE shufflesTotal #-}
+shufflesTotal :: IORef Int
+shufflesTotal = unsafePerformIO (newIORef 0)
+
+{-# NOINLINE shuffleErrors #-}
+shuffleErrors :: IORef Int
+shuffleErrors = unsafePerformIO (newIORef 0)
+
+{-# NOINLINE entropySum #-}
+entropySum :: IORef Double
+entropySum = unsafePerformIO (newIORef 0.0)
+
+{-# NOINLINE entropyCount #-}
+entropyCount :: IORef Int
+entropyCount = unsafePerformIO (newIORef 0)
+
+bumpCounter :: IORef Int -> IO ()
+bumpCounter ref = atomicModifyIORef' ref (\n -> (n + 1, ()))
+
+recordEntropy :: Double -> IO ()
+recordEntropy e = do
+  atomicModifyIORef' entropySum   (\s -> (s + e, ()))
+  atomicModifyIORef' entropyCount (\n -> (n + 1, ()))
+
+handleMetrics :: IO Response
+handleMetrics = do
+  s   <- readIORef shufflesTotal
+  err <- readIORef shuffleErrors
+  es  <- readIORef entropySum
+  ec  <- readIORef entropyCount
+  let avgE = if ec == 0 then 0.0 else es / fromIntegral ec
+  return $ jsonResponse status200 (object
+    [ "shuffle_total"          .= s
+    , "shuffle_errors_total"   .= err
+    , "shuffle_recorded_count" .= ec
+    , "shuffle_avg_entropy"    .= avgE
+    ])
+
+-- ---- 分布均一性テスト ----
+-- 与えられた配列を N 回シャッフルし、各位置に各値が出現した回数の χ² 風統計を返す。
+data DistributionRequest = DistributionRequest
+  { drIds        :: [Int]
+  , drIterations :: Int
+  }
+
+instance Data.Aeson.FromJSON DistributionRequest where
+  parseJSON = Data.Aeson.withObject "DistributionRequest" $ \v ->
+    DistributionRequest
+      <$> v Data.Aeson..: "ids"
+      <*> v Data.Aeson..: "iterations"
+
+handleDistribution :: Request -> IO Response
+handleDistribution req = do
+  body <- lazyRequestBody req
+  case Data.Aeson.decode body :: Maybe DistributionRequest of
+    Nothing -> do
+      bumpCounter shuffleErrors
+      return $ errorResponse status400 "expected {\"ids\":[...],\"iterations\":N}"
+    Just dr
+      | drIterations dr < 10 || drIterations dr > 5000 ->
+          return $ errorResponse status400 "iterations must be in [10,5000]"
+      | length (drIds dr) < 2 || length (drIds dr) > 50 ->
+          return $ errorResponse status400 "ids length must be in [2,50]"
+      | otherwise -> do
+          let n   = length (drIds dr)
+              vec = V.fromList (drIds dr)
+          runs <- replicateM (drIterations dr) (V.toList <$> fisherYates vec)
+          let expected   = fromIntegral (drIterations dr) / fromIntegral n :: Double
+              -- position * value -> observed count
+              cells      = [ ((pos, v), 1 :: Int) | r <- runs, (pos, v) <- zip [0 ..] r ]
+              counts     = Map.fromListWith (+) cells
+              chi2 :: Double
+              chi2       = sum
+                [ let o = fromIntegral (Map.findWithDefault 0 (pos, v) counts) :: Double
+                  in (o - expected) ** 2 / expected
+                | pos <- [0 .. n - 1]
+                , v   <- drIds dr
+                ]
+              dof        = (n - 1) * (n - 1)
+              perPositionFreq =
+                [ object
+                    [ "position" .= pos
+                    , "frequencies" .=
+                        [ object
+                            [ "value" .= v
+                            , "count" .= Map.findWithDefault 0 (pos, v) counts
+                            ]
+                        | v <- drIds dr
+                        ]
+                    ]
+                | pos <- [0 .. n - 1]
+                ]
+          return $ jsonResponse status200 (object
+            [ "iterations"  .= drIterations dr
+            , "size"        .= n
+            , "expected"    .= expected
+            , "chi_squared" .= chi2
+            , "dof"         .= dof
+            , "distribution" .= perPositionFreq
+            ])
+
 -- ---- 追加ヘルパー: シャッフル結果の独立性チェック ----
 
 countFixedPoints :: [Int] -> [Int] -> Int
@@ -506,6 +624,118 @@ fixedPointRatio orig shuf =
     -1 -> -1.0
     n  -> if null orig then 0.0
                        else fromIntegral n / fromIntegral (length orig)
+
+-- ---- /partition: 入力を N グループに均等分割しつつ各グループ内でシャッフル ----
+-- 例えば 30 枚のカードを 3 グループに分けて配るときに使う。各グループは Fisher-Yates 済み。
+
+data PartitionRequest = PartitionRequest
+  { prIds    :: [Int]
+  , prGroups :: Int
+  }
+
+instance Data.Aeson.FromJSON PartitionRequest where
+  parseJSON = Data.Aeson.withObject "PartitionRequest" $ \v ->
+    PartitionRequest <$> v Data.Aeson..: "ids" <*> v Data.Aeson..: "groups"
+
+partitionList :: Int -> [a] -> [[a]]
+partitionList g xs
+  | g <= 0    = [xs]
+  | otherwise =
+      let n     = length xs
+          base  = n `div` g
+          extra = n `mod` g
+          sizes = replicate extra (base + 1) ++ replicate (g - extra) base
+          go _ []         = []
+          go (s:rest) ys  = take s ys : go rest (drop s ys)
+          go [] _         = []
+      in go sizes xs
+
+handlePartition :: Request -> IO Response
+handlePartition req = do
+  body <- lazyRequestBody req
+  case Data.Aeson.decode body :: Maybe PartitionRequest of
+    Nothing -> do
+      bumpCounter shuffleErrors
+      return $ errorResponse status400 "expected {\"ids\":[...],\"groups\":N}"
+    Just pr
+      | prGroups pr < 1 || prGroups pr > 32 ->
+          return $ errorResponse status400 "groups must be in [1,32]"
+      | otherwise -> case validateInput (prIds pr) of
+          Left EmptyInput -> return $ errorResponse status400 "empty ids"
+          Left (TooManyItems n mx) ->
+            return $ errorResponse status400
+              ("too many items: " ++ show n ++ " (max " ++ show mx ++ ")")
+          Left (InvalidInput msg) -> return $ errorResponse status400 msg
+          Right vec -> do
+            shuffled <- fisherYates vec
+            let groups = partitionList (prGroups pr) (V.toList shuffled)
+            bumpCounter shufflesTotal
+            recordEntropy (ssEntropy (computeStats shuffled))
+            return $ jsonResponse status200 (object
+              [ "groups"        .= groups
+              , "group_count"   .= prGroups pr
+              , "total_items"   .= V.length vec
+              , "algorithm"     .= ("fisher-yates+partition" :: String)
+              ])
+
+-- ---- /sample: 重み無しの単純サンプリング（重複あり） ----
+
+data SampleRequest = SampleRequest
+  { spIds :: [Int]
+  , spN   :: Int
+  , spReplacement :: Bool
+  }
+
+instance Data.Aeson.FromJSON SampleRequest where
+  parseJSON = Data.Aeson.withObject "SampleRequest" $ \v ->
+    SampleRequest
+      <$> v Data.Aeson..: "ids"
+      <*> v Data.Aeson..: "n"
+      <*> v Data.Aeson..: "replacement"
+
+sampleWithReplacement :: V.Vector Int -> Int -> IO [Int]
+sampleWithReplacement vec n = do
+  let len = V.length vec
+  replicateM n $ do
+    idx <- randomRIO (0, len - 1)
+    return (vec V.! idx)
+
+sampleWithoutReplacement :: V.Vector Int -> Int -> IO [Int]
+sampleWithoutReplacement vec n = do
+  shuffled <- fisherYates vec
+  return (V.toList (V.take n shuffled))
+
+handleSample :: Request -> IO Response
+handleSample req = do
+  body <- lazyRequestBody req
+  case Data.Aeson.decode body :: Maybe SampleRequest of
+    Nothing -> do
+      bumpCounter shuffleErrors
+      return $ errorResponse status400 "expected {\"ids\":[...],\"n\":N,\"replacement\":bool}"
+    Just sp
+      | spN sp < 1 -> return $ errorResponse status400 "n must be >= 1"
+      | spN sp > maxShuffleSize ->
+          return $ errorResponse status400 "n too large"
+      | not (spReplacement sp) && spN sp > length (spIds sp) ->
+          return $ errorResponse status400 "n exceeds ids length without replacement"
+      | otherwise -> case validateInput (spIds sp) of
+          Left EmptyInput -> return $ errorResponse status400 "empty ids"
+          Left (TooManyItems n mx) ->
+            return $ errorResponse status400
+              ("too many items: " ++ show n ++ " (max " ++ show mx ++ ")")
+          Left (InvalidInput msg) -> return $ errorResponse status400 msg
+          Right vec -> do
+            sampled <-
+              if spReplacement sp
+                then sampleWithReplacement vec (spN sp)
+                else sampleWithoutReplacement vec (spN sp)
+            bumpCounter shufflesTotal
+            return $ jsonResponse status200 (object
+              [ "sample"      .= sampled
+              , "n"           .= spN sp
+              , "replacement" .= spReplacement sp
+              , "algorithm"   .= ("uniform-sample" :: String)
+              ])
 
 -- ---- メイン ----
 

@@ -354,6 +354,209 @@ async fn health(state: web::Data<Arc<AppState>>) -> HttpResponse {
     })
 }
 
+// ---- メトリクス ----
+
+use std::sync::atomic::{AtomicU64, Ordering};
+
+#[derive(Debug, Default)]
+struct Metrics {
+    judges_total:       AtomicU64,
+    judges_won:         AtomicU64,
+    judges_lost:        AtomicU64,
+    judges_rejected:    AtomicU64,
+    response_ms_sum:    AtomicU64,
+    response_ms_count:  AtomicU64,
+    cache_hits:         AtomicU64,
+    cache_misses:       AtomicU64,
+}
+
+impl Metrics {
+    fn record_judge(&self, won: bool, response_ms: i64) {
+        self.judges_total.fetch_add(1, Ordering::Relaxed);
+        if won {
+            self.judges_won.fetch_add(1, Ordering::Relaxed);
+        } else {
+            self.judges_lost.fetch_add(1, Ordering::Relaxed);
+        }
+        if response_ms >= 0 {
+            self.response_ms_sum.fetch_add(response_ms as u64, Ordering::Relaxed);
+            self.response_ms_count.fetch_add(1, Ordering::Relaxed);
+        }
+    }
+
+    fn record_rejected(&self) {
+        self.judges_rejected.fetch_add(1, Ordering::Relaxed);
+    }
+
+    fn record_cache(&self, hit: bool) {
+        if hit { self.cache_hits.fetch_add(1, Ordering::Relaxed); }
+        else   { self.cache_misses.fetch_add(1, Ordering::Relaxed); }
+    }
+
+    fn avg_response_ms(&self) -> f64 {
+        let n = self.response_ms_count.load(Ordering::Relaxed);
+        if n == 0 { return 0.0; }
+        self.response_ms_sum.load(Ordering::Relaxed) as f64 / n as f64
+    }
+
+    fn cache_hit_ratio(&self) -> f64 {
+        let h = self.cache_hits.load(Ordering::Relaxed);
+        let m = self.cache_misses.load(Ordering::Relaxed);
+        let total = h + m;
+        if total == 0 { return 0.0; }
+        h as f64 / total as f64
+    }
+
+    fn render_prometheus(&self) -> String {
+        let mut s = String::new();
+        s.push_str("# HELP judge_judges_total Total judge calls\n");
+        s.push_str("# TYPE judge_judges_total counter\n");
+        s.push_str(&format!("judge_judges_total {}\n", self.judges_total.load(Ordering::Relaxed)));
+        s.push_str("# HELP judge_judges_won_total Calls that resulted in a win\n");
+        s.push_str("# TYPE judge_judges_won_total counter\n");
+        s.push_str(&format!("judge_judges_won_total {}\n", self.judges_won.load(Ordering::Relaxed)));
+        s.push_str("# HELP judge_judges_lost_total Calls that resulted in a loss\n");
+        s.push_str("# TYPE judge_judges_lost_total counter\n");
+        s.push_str(&format!("judge_judges_lost_total {}\n", self.judges_lost.load(Ordering::Relaxed)));
+        s.push_str("# HELP judge_judges_rejected_total Calls rejected by validation/rate limit\n");
+        s.push_str("# TYPE judge_judges_rejected_total counter\n");
+        s.push_str(&format!("judge_judges_rejected_total {}\n", self.judges_rejected.load(Ordering::Relaxed)));
+        s.push_str("# HELP judge_response_avg_ms Average response time in ms\n");
+        s.push_str("# TYPE judge_response_avg_ms gauge\n");
+        s.push_str(&format!("judge_response_avg_ms {:.3}\n", self.avg_response_ms()));
+        s.push_str("# HELP judge_cache_hit_ratio Idempotency cache hit ratio (0..1)\n");
+        s.push_str("# TYPE judge_cache_hit_ratio gauge\n");
+        s.push_str(&format!("judge_cache_hit_ratio {:.3}\n", self.cache_hit_ratio()));
+        s
+    }
+}
+
+async fn metrics_handler(metrics: web::Data<Arc<Metrics>>) -> HttpResponse {
+    HttpResponse::Ok()
+        .content_type("text/plain; version=0.0.4; charset=utf-8")
+        .body(metrics.render_prometheus())
+}
+
+// ---- ハンドラ: ルームのリーダーボード ----
+// 単一ルーム内のプレイヤー別獲得枚数を多い順に並べ、勝率や平均応答時間も付与する。
+
+#[derive(Serialize, Debug)]
+struct LeaderboardRow {
+    rank:               u32,
+    player_id:          String,
+    score:              u32,
+    avg_response_ms:    Option<f64>,
+    fastest_ms:         Option<i64>,
+    win_rate:           f64,
+}
+
+async fn get_leaderboard(
+    state: web::Data<Arc<AppState>>,
+    path: web::Path<String>,
+) -> HttpResponse {
+    let room_id = path.into_inner();
+
+    let scores: Vec<(String, u32)> = state
+        .scores
+        .get(&room_id)
+        .map(|m| m.iter().map(|e| (e.key().clone(), *e.value())).collect())
+        .unwrap_or_default();
+
+    let total_cards: u32 = scores.iter().map(|(_, v)| v).sum();
+
+    let history = state.history.get(&room_id);
+
+    let mut rows: Vec<LeaderboardRow> = scores
+        .into_iter()
+        .map(|(player_id, score)| {
+            let (avg, fastest) = if let Some(h) = history.as_ref() {
+                let mine: Vec<i64> = h
+                    .iter()
+                    .filter_map(|(_, p, ms)| if *p == player_id { Some(*ms) } else { None })
+                    .collect();
+                if mine.is_empty() {
+                    (None, None)
+                } else {
+                    let sum: i64 = mine.iter().sum();
+                    let avg = sum as f64 / mine.len() as f64;
+                    let fastest = *mine.iter().min().unwrap();
+                    (Some(avg), Some(fastest))
+                }
+            } else {
+                (None, None)
+            };
+            let win_rate = if total_cards == 0 {
+                0.0
+            } else {
+                score as f64 / total_cards as f64
+            };
+            LeaderboardRow {
+                rank: 0, // 後で sort して採番
+                player_id,
+                score,
+                avg_response_ms: avg,
+                fastest_ms: fastest,
+                win_rate,
+            }
+        })
+        .collect();
+
+    rows.sort_by(|a, b| b.score.cmp(&a.score)
+        .then_with(|| a.avg_response_ms.unwrap_or(f64::INFINITY)
+            .partial_cmp(&b.avg_response_ms.unwrap_or(f64::INFINITY))
+            .unwrap_or(std::cmp::Ordering::Equal)));
+
+    for (i, row) in rows.iter_mut().enumerate() {
+        row.rank = (i as u32) + 1;
+    }
+
+    HttpResponse::Ok().json(serde_json::json!({
+        "room_id": room_id,
+        "total_cards": total_cards,
+        "rows": rows,
+    }))
+}
+
+// ---- ハンドラ: 直近の取り札イベント ----
+
+#[derive(Serialize, Debug)]
+struct RecentEvent {
+    card_id:     u32,
+    player_id:   String,
+    response_ms: i64,
+}
+
+async fn recent_takes(
+    state: web::Data<Arc<AppState>>,
+    path: web::Path<String>,
+    query: web::Query<std::collections::HashMap<String, String>>,
+) -> HttpResponse {
+    let room_id = path.into_inner();
+    let limit: usize = query
+        .get("limit")
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(20)
+        .min(200);
+
+    let events: Vec<RecentEvent> = state
+        .history
+        .get(&room_id)
+        .map(|h| {
+            h.iter()
+                .rev()
+                .take(limit)
+                .map(|(card_id, player_id, ms)| RecentEvent {
+                    card_id:     *card_id,
+                    player_id:   player_id.clone(),
+                    response_ms: *ms,
+                })
+                .collect()
+        })
+        .unwrap_or_default();
+
+    HttpResponse::Ok().json(events)
+}
+
 // ---- テスト ----
 
 #[cfg(test)]
@@ -495,6 +698,103 @@ mod tests {
     }
 
     #[actix_web::test]
+    async fn test_metrics_render_includes_expected_lines() {
+        let m = Metrics::default();
+        m.record_judge(true, 12);
+        m.record_judge(false, 34);
+        m.record_rejected();
+        m.record_cache(true);
+        m.record_cache(false);
+        let out = m.render_prometheus();
+        for needle in [
+            "judge_judges_total 2",
+            "judge_judges_won_total 1",
+            "judge_judges_lost_total 1",
+            "judge_judges_rejected_total 1",
+            "judge_response_avg_ms",
+            "judge_cache_hit_ratio",
+        ] {
+            assert!(out.contains(needle), "missing {needle} in metrics output:\n{out}");
+        }
+    }
+
+    #[actix_web::test]
+    async fn test_rate_limiter_allows_after_interval() {
+        let rl = PlayerRateLimiter::new(10, 100);
+        assert!(rl.check("p2").is_ok());
+        std::thread::sleep(std::time::Duration::from_millis(15));
+        assert!(rl.check("p2").is_ok(), "should allow after interval");
+    }
+
+    #[actix_web::test]
+    async fn test_rate_limiter_minute_cap() {
+        let rl = PlayerRateLimiter::new(0, 3);
+        assert!(rl.check("burst").is_ok());
+        assert!(rl.check("burst").is_ok());
+        assert!(rl.check("burst").is_ok());
+        assert!(rl.check("burst").is_err(), "4th call should hit per-minute cap");
+        rl.reset_minute_counters();
+        assert!(rl.check("burst").is_ok(), "reset should clear cap");
+    }
+
+    #[actix_web::test]
+    async fn test_validation_rejects_oversized_ids() {
+        let state = make_state();
+        let app = test::init_service(
+            App::new()
+                .app_data(web::Data::new(Arc::clone(&state)))
+                .route("/judge", web::post().to(judge)),
+        ).await;
+
+        let long_room = "x".repeat(65);
+        let req = test::TestRequest::post().uri("/judge")
+            .set_json(judge_body(&long_room, 1, "p")).to_request();
+        let resp = test::call_service(&app, req).await;
+        assert_eq!(resp.status(), StatusCode::BAD_REQUEST);
+
+        let long_player = "y".repeat(33);
+        let req = test::TestRequest::post().uri("/judge")
+            .set_json(judge_body("room1", 1, &long_player)).to_request();
+        let resp = test::call_service(&app, req).await;
+        assert_eq!(resp.status(), StatusCode::BAD_REQUEST);
+    }
+
+    #[actix_web::test]
+    async fn test_recent_takes_returns_latest_first() {
+        let state = make_state();
+        let app = test::init_service(
+            App::new()
+                .app_data(web::Data::new(Arc::clone(&state)))
+                .route("/judge", web::post().to(judge))
+                .route("/recent/{room_id}", web::get().to(recent_takes)),
+        ).await;
+
+        for cid in 1u32..=5 {
+            let req = test::TestRequest::post().uri("/judge")
+                .set_json(judge_body("room-recent", cid, &format!("p{}", cid))).to_request();
+            test::call_service(&app, req).await;
+        }
+        let req = test::TestRequest::get().uri("/recent/room-recent?limit=3").to_request();
+        let resp = test::call_service(&app, req).await;
+        assert_eq!(resp.status(), StatusCode::OK);
+        let events: Vec<RecentEvent> = test::read_body_json(resp).await;
+        assert_eq!(events.len(), 3);
+        assert_eq!(events[0].card_id, 5);
+        assert_eq!(events[2].card_id, 3);
+    }
+
+    #[actix_web::test]
+    async fn test_idempotency_cache_independent_keys() {
+        let cache = IdempotencyCache::new(60);
+        for i in 0..50 {
+            assert!(cache.check_and_insert(&format!("k{}", i)));
+        }
+        for i in 0..50 {
+            assert!(!cache.check_and_insert(&format!("k{}", i)));
+        }
+    }
+
+    #[actix_web::test]
     async fn test_validation_rejects_empty_player_id() {
         let state = make_state();
         let app = test::init_service(
@@ -517,6 +817,7 @@ async fn main() -> std::io::Result<()> {
     env_logger::init_from_env(env_logger::Env::default().default_filter_or("info"));
 
     let state = Arc::new(AppState::new());
+    let metrics = Arc::new(Metrics::default());
 
     println!("judge service listening on :5002");
 
@@ -535,12 +836,16 @@ async fn main() -> std::io::Result<()> {
                     })
             )
             .app_data(web::Data::new(Arc::clone(&state)))
-            .route("/judge",          web::post().to(judge))
-            .route("/judge/batch",    web::post().to(batch_judge))
-            .route("/judge/read",     web::post().to(mark_card_read))
-            .route("/reset/{room_id}", web::post().to(reset_room))
-            .route("/stats/{room_id}", web::get().to(get_room_stats))
-            .route("/health",          web::get().to(health))
+            .app_data(web::Data::new(Arc::clone(&metrics)))
+            .route("/judge",            web::post().to(judge))
+            .route("/judge/batch",      web::post().to(batch_judge))
+            .route("/judge/read",       web::post().to(mark_card_read))
+            .route("/reset/{room_id}",  web::post().to(reset_room))
+            .route("/stats/{room_id}",  web::get().to(get_room_stats))
+            .route("/recent/{room_id}",       web::get().to(recent_takes))
+            .route("/leaderboard/{room_id}",  web::get().to(get_leaderboard))
+            .route("/metrics",                web::get().to(metrics_handler))
+            .route("/health",           web::get().to(health))
     })
     .bind("0.0.0.0:5002")?
     .run()

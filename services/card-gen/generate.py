@@ -232,83 +232,10 @@ def main() -> None:
     generate(cards)
 
 
-# ---- ユニットテスト ----
-
-def _self_test() -> None:
-    import unittest
-
-    class CardValidationTests(unittest.TestCase):
-        def test_valid_card_has_no_errors(self):
-            self.assertEqual(validate_card(CARDS[0]), [])
-
-        def test_negative_id_rejected(self):
-            bad = dict(CARDS[0]); bad["id"] = -1
-            errs = validate_card(bad)  # type: ignore[arg-type]
-            self.assertTrue(any("positive integer" in e for e in errs))
-
-        def test_empty_fuda_rejected(self):
-            bad = dict(CARDS[0]); bad["fuda"] = "  "
-            errs = validate_card(bad)  # type: ignore[arg-type]
-            self.assertTrue(any("fuda" in e for e in errs))
-
-        def test_bad_image_path_rejected(self):
-            bad = dict(CARDS[0]); bad["image"] = "no/path.exe"
-            errs = validate_card(bad)  # type: ignore[arg-type]
-            self.assertTrue(any("image path" in e for e in errs))
-
-        def test_validate_all_detects_duplicate_id(self):
-            dup = list(CARDS) + [dict(CARDS[0])]  # type: ignore[list-item]
-            results = validate_all(dup)  # type: ignore[arg-type]
-            self.assertTrue(any("duplicate id" in e for v in results.values() for e in v))
-
-    class SearchTests(unittest.TestCase):
-        def test_search_returns_matching_cards(self):
-            results = search_cards(CARDS, "そう")
-            self.assertGreater(len(results), 0)
-
-        def test_search_is_case_insensitive(self):
-            r1 = search_cards(CARDS, "SOU")
-            r2 = search_cards(CARDS, "sou")
-            self.assertEqual(len(r1), len(r2))
-
-        def test_score_card_higher_for_fuda_match(self):
-            card = CARDS[0]
-            score_fuda = score_card(card, card["fuda"][:3])
-            score_yomi = score_card(card, card["yomi"][:3])
-            self.assertGreater(score_fuda, 0)
-            self.assertGreater(score_yomi, 0)
-
-        def test_ranked_search_respects_limit(self):
-            results = ranked_search(CARDS, "や", limit=3)
-            self.assertLessEqual(len(results), 3)
-
-    class CategoryTests(unittest.TestCase):
-        def test_filter_by_category_returns_only_that_category(self):
-            cat = CARDS[0]["category"]
-            for c in filter_by_category(CARDS, cat):
-                self.assertEqual(c["category"], cat)
-
-        def test_get_category_stats_sums_to_total(self):
-            stats = get_category_stats(CARDS)
-            self.assertEqual(sum(stats.values()), len(CARDS))
-
-    class LoaderIntegrationTests(unittest.TestCase):
-        def test_all_30_cards_loaded(self):
-            self.assertEqual(len(CARDS), 30)
-
-        def test_all_3_sets_loaded(self):
-            self.assertEqual(len(SETS), 3)
-
-        def test_every_card_has_set(self):
-            for c in CARDS:
-                self.assertIn(c["set"], SET_IDS)
-
-    suite = unittest.TestLoader().loadTestsFromModule(__import__(__name__))
-    unittest.TextTestRunner(verbosity=2).run(suite)
-
-
 if __name__ == "__main__":
     if os.environ.get("CARD_GEN_MODE") == "test":
-        _self_test()
+        import unittest
+        from tests.test_generate import build_suite
+        unittest.TextTestRunner(verbosity=2).run(build_suite())
     else:
         main()

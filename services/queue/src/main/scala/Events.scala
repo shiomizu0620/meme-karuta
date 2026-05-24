@@ -152,6 +152,59 @@ object EventSerializer {
   }
 }
 
+// ---- 追加イベント型 ----
+
+case class EventSnapshot(
+    roomId: String,
+    eventCount: Int,
+    lastEventId: String,
+    capturedAt: Instant = Instant.now(),
+    timestamp: Instant = Instant.now(),
+    eventId: String = EventId.next(),
+) extends GameEvent
+
+case class EventReplay(
+    roomId: String,
+    fromEventId: String,
+    toEventId: String,
+    eventCount: Int,
+    timestamp: Instant = Instant.now(),
+    eventId: String = EventId.next(),
+) extends GameEvent
+
+// ---- 永続化に使う簡易JSONエンコーダ ----
+// 外部の json4s/circe 等に依存せず、Map[String, Any] を JSONL 互換で書き出すための最小実装。
+object JsonLine {
+  def encode(m: Map[String, Any]): String = "{" + m.toSeq.map { case (k, v) => quote(k) + ":" + value(v) }.mkString(",") + "}"
+
+  private def value(v: Any): String = v match {
+    case null            => "null"
+    case s: String       => quote(s)
+    case n: Int          => n.toString
+    case n: Long         => n.toString
+    case n: Double       => n.toString
+    case b: Boolean      => b.toString
+    case xs: Seq[_]      => "[" + xs.map(value).mkString(",") + "]"
+    case xs: List[_]     => "[" + xs.map(value).mkString(",") + "]"
+    case m: Map[_, _]    => "{" + m.toSeq.map { case (k, v2) => quote(k.toString) + ":" + value(v2) }.mkString(",") + "}"
+    case other           => quote(other.toString)
+  }
+
+  private def quote(s: String): String = {
+    val sb = new StringBuilder("\"")
+    s.foreach {
+      case '"'  => sb.append("\\\"")
+      case '\\' => sb.append("\\\\")
+      case '\n' => sb.append("\\n")
+      case '\r' => sb.append("\\r")
+      case '\t' => sb.append("\\t")
+      case c if c < 0x20 => sb.append(f"\\u${c.toInt}%04x")
+      case c    => sb.append(c)
+    }
+    sb.append('"').toString
+  }
+}
+
 // ---- イベントフィルタ ----
 
 object EventFilter {
