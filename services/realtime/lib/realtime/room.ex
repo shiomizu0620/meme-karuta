@@ -19,6 +19,7 @@ defmodule Realtime.Room do
   def remove_custom_card(room_id, name, card_id), do: call(room_id, {:remove_custom_card, name, card_id}, {:error, "room not found"})
   def start_game(room_id, settings, cards), do: call(room_id, {:start_game, settings, cards}, {:error, "room not found"})
   def next_card(room_id), do: call(room_id, :next_card, {:error, "room not found"})
+  def speak_card(room_id), do: call(room_id, :speak_card, {:error, "room not found"})
   def take_card(room_id, card_id, name), do: call(room_id, {:take_card, card_id, name}, {:error, "room not found"})
   def attempt_take(room_id, card_id, name), do: call(room_id, {:attempt_take, card_id, name}, {:error, "room not found"})
 
@@ -113,6 +114,21 @@ defmodule Realtime.Room do
         broadcast_card_reading(state.players, cards, 0)
         schedule_time_limit(settings)
         {:reply, :ok, new_state}
+    end
+  end
+
+  def handle_call(:speak_card, _from, state) do
+    cond do
+      state.status != :playing ->
+        {:reply, {:error, "ゲームが進行中ではありません"}, state}
+      true ->
+        case Enum.at(state.cards, state.current_card_idx) do
+          %{"yomi" => yomi} = card ->
+            broadcast(state.players, %{type: "card_speak", card_id: card["id"], yomi: yomi})
+            {:reply, :ok, state}
+          _ ->
+            {:reply, {:error, "現在の札が見つかりません"}, state}
+        end
     end
   end
 

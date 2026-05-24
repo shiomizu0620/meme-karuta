@@ -89,7 +89,16 @@ export function useGame() {
     } else if (t === "card_reading") {
       setIsFouled(false);
       setCardResolved(false);
+      if (typeof window !== "undefined" && window.speechSynthesis) window.speechSynthesis.cancel();
       setRoom((p) => p?.game ? { ...p, game: { ...p.game, currentCard: msg.card as Card, currentCardIndex: msg.index as number } } : p);
+    } else if (t === "card_speak") {
+      const yomi = String(msg.yomi ?? "");
+      if (yomi && typeof window !== "undefined" && window.speechSynthesis) {
+        window.speechSynthesis.cancel();
+        const utter = new SpeechSynthesisUtterance(yomi);
+        utter.lang = "ja-JP";
+        window.speechSynthesis.speak(utter);
+      }
     } else if (t === "card_taken") {
       const cardId = msg.card_id as number;
       const winner = String(msg.winner ?? "");
@@ -146,6 +155,7 @@ export function useGame() {
 
   const startGame = useCallback((settings: GameSettings) => send({ type: "start_game", ...settings }), [send]);
   const nextCard = useCallback(() => send({ type: "next_card" }), [send]);
+  const speakCard = useCallback(() => send({ type: "speak_card" }), [send]);
   const takeCard = useCallback((cardId: number) => send({ type: "take_card", card_id: cardId }), [send]);
   const addCustomCard = useCallback(
     (input: { fuda: string; yomi: string; image: string }) =>
@@ -158,5 +168,5 @@ export function useGame() {
   );
   const resetError = useCallback(() => { setPhase("idle"); setErrorMsg(null); }, []);
 
-  return { phase, room, errorMsg, isFouled, cardResolved, createRoom, joinRoom, leaveRoom, startGame, nextCard, takeCard, addCustomCard, removeCustomCard, resetError };
+  return { phase, room, errorMsg, isFouled, cardResolved, createRoom, joinRoom, leaveRoom, startGame, nextCard, speakCard, takeCard, addCustomCard, removeCustomCard, resetError };
 }
