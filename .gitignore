@@ -1,6 +1,3 @@
-# 著作権のある画像は除外
-services/frontend/public/images/
-
 # 依存関係
 node_modules/
 target/

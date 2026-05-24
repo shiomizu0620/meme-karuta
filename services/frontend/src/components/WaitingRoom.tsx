@@ -1,5 +1,7 @@
 import { useEffect, useState } from "react";
-import type { GameSettings } from "../hooks/useGame";
+import type { Card, GameSettings } from "../hooks/useGame";
+import { CUSTOM_CARD_MAX } from "../hooks/useGame";
+import { CustomCardUploader } from "./CustomCardUploader";
 
 type SetInfo = { id: string; name: string; description: string };
 
@@ -8,8 +10,12 @@ type Props = {
   players: string[];
   isHost: boolean;
   playerName: string;
+  customCards: Card[];
   onLeave: () => void;
   onStartGame: (settings: GameSettings) => void;
+  onAddCustomCard: (input: { fuda: string; yomi: string; image: string }) => void;
+  onRemoveCustomCard: (id: number) => void;
+  errorMsg: string | null;
 };
 
 const GATEWAY_URL =
@@ -18,7 +24,7 @@ const GATEWAY_URL =
 
 const DEFAULT_SET_IDS = ["basic", "sns", "tv", "anime_manga"];
 
-export function WaitingRoom({ roomId, players, isHost, playerName, onLeave, onStartGame }: Props) {
+export function WaitingRoom({ roomId, players, isHost, playerName, customCards, onLeave, onStartGame, onAddCustomCard, onRemoveCustomCard, errorMsg }: Props) {
   const [copied, setCopied] = useState(false);
   const [yomiteMode, setYomiteMode] = useState<"ai" | "player">("ai");
   const [yomiteName, setYomiteName] = useState(playerName);
@@ -36,6 +42,8 @@ export function WaitingRoom({ roomId, players, isHost, playerName, onLeave, onSt
       })
       .catch(() => {});
   }, [isHost]);
+
+  const hasContent = selectedSets.length > 0 || customCards.length > 0;
 
   const copyRoomId = () => {
     navigator.clipboard.writeText(roomId).then(() => {
@@ -85,6 +93,17 @@ export function WaitingRoom({ roomId, players, isHost, playerName, onLeave, onSt
             ))}
           </ul>
         </div>
+        <div className="waiting__section">
+          <CustomCardUploader
+            cards={customCards}
+            playerName={playerName}
+            isHost={isHost}
+            maxCards={CUSTOM_CARD_MAX}
+            onAdd={onAddCustomCard}
+            onRemove={onRemoveCustomCard}
+          />
+          {errorMsg && <p className="waiting__set-warn">{errorMsg}</p>}
+        </div>
         {isHost ? (
           <div className="waiting__settings">
             <p className="waiting__section-title">ゲーム設定</p>
@@ -105,8 +124,8 @@ export function WaitingRoom({ roomId, players, isHost, playerName, onLeave, onSt
                     </label>
                   ))}
                 </div>
-                {selectedSets.length === 0 && (
-                  <p className="waiting__set-warn">少なくとも1つのセットを選んでください</p>
+                {!hasContent && (
+                  <p className="waiting__set-warn">セットまたはカスタム札を1枚以上用意してください</p>
                 )}
               </div>
             )}
@@ -138,7 +157,7 @@ export function WaitingRoom({ roomId, players, isHost, playerName, onLeave, onSt
               <input type="number" className="waiting__number-input" min={endMode === "count" ? 1 : 10} max={endMode === "count" ? 10 : 300} value={endValue} onChange={(e) => setEndValue(Number(e.target.value))} />
             </label>
             {players.length < 2 && <p className="waiting__set-warn">あと{2 - players.length}人の参加が必要です</p>}
-            <button type="button" className="waiting__start-btn" onClick={handleStart} disabled={players.length < 2 || selectedSets.length === 0}>ゲームスタート</button>
+            <button type="button" className="waiting__start-btn" onClick={handleStart} disabled={players.length < 2 || !hasContent}>ゲームスタート</button>
           </div>
         ) : (
           <p className="waiting__status">ホストがゲームを開始するまでお待ちください</p>

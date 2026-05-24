@@ -17,11 +17,12 @@ export function Pokedex({ playerName, onClose }: Props) {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    const encoded = encodeURIComponent(playerName);
-    Promise.all([
-      fetch(`${GATEWAY_URL}/api/cards`).then((r) => r.json()),
-      fetch(`${GATEWAY_URL}/api/pokedex/player/${encoded}`).then((r) => r.json()),
-    ])
+    const cardsPromise = fetch(`${GATEWAY_URL}/api/cards`).then((r) => r.json());
+    const pokedexPromise = playerName
+      ? fetch(`${GATEWAY_URL}/api/pokedex/player/${encodeURIComponent(playerName)}`).then((r) => r.json())
+      : Promise.resolve({ card_ids: [] });
+
+    Promise.all([cardsPromise, pokedexPromise])
       .then(([cardsData, pokedexData]) => {
         const cards: Card[] = Array.isArray(cardsData)
           ? cardsData
@@ -41,7 +42,7 @@ export function Pokedex({ playerName, onClose }: Props) {
       <div className="pokedex__header">
         <div>
           <h2 className="pokedex__title">図鑑</h2>
-          <p className="pokedex__player">{playerName} の収集記録</p>
+          <p className="pokedex__player">{playerName ? `${playerName} の収集記録` : "カード一覧"}</p>
         </div>
         <div className="pokedex__meta">
           <span className="pokedex__progress-text">

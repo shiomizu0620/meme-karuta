@@ -5,12 +5,18 @@ defmodule Realtime.Room do
     GenServer.start_link(__MODULE__, max_players, name: via(room_id))
   end
 
+  @custom_card_max 10
+  @custom_id_base 1_000_000
+
   def join(room_id, pid, name), do: call(room_id, {:join, pid, name}, {:error, "room not found"})
   def leave(room_id, pid), do: (try do GenServer.cast(via(room_id), {:leave, pid}) rescue _ -> :ok end)
   def list_players(room_id), do: call(room_id, :list_players, [])
   def player_count(room_id), do: call(room_id, :player_count, 0)
   def get_host(room_id), do: call(room_id, :get_host, nil)
   def get_settings(room_id), do: call(room_id, :get_settings, nil)
+  def list_custom_cards(room_id), do: call(room_id, :list_custom_cards, [])
+  def add_custom_card(room_id, name, payload), do: call(room_id, {:add_custom_card, name, payload}, {:error, "room not found"})
+  def remove_custom_card(room_id, name, card_id), do: call(room_id, {:remove_custom_card, name, card_id}, {:error, "room not found"})
   def start_game(room_id, settings, cards), do: call(room_id, {:start_game, settings, cards}, {:error, "room not found"})
   def next_card(room_id), do: call(room_id, :next_card, {:error, "room not found"})
   def take_card(room_id, card_id, name), do: call(room_id, {:take_card, card_id, name}, {:error, "room not found"})
@@ -26,7 +32,8 @@ defmodule Realtime.Room do
   def init(max_players) do
     {:ok, %{players: [], max_players: max_players, host: nil, status: :waiting,
             settings: nil, cards: [], current_card_idx: -1,
-            taken_card_ids: MapSet.new(), scores: %{}, foul_players: MapSet.new(), card_resolved: false}}
+            taken_card_ids: MapSet.new(), scores: %{}, foul_players: MapSet.new(), card_resolved: false,
+            custom_cards: [], next_custom_id: @custom_id_base}}
   end
 
   @impl true
@@ -48,6 +55,46 @@ defmodule Realtime.Room do
   def handle_call(:player_count, _from, s), do: {:reply, length(s.players), s}
   def handle_call(:get_host, _from, s), do: {:reply, s.host, s}
   def handle_call(:get_settings, _from, s), do: {:reply, s.settings, s}
+  def handle_call(:list_custom_cards, _from, s), do: {:reply, s.custom_cards, s}
+
+  def handle_call({:add_custom_card, name, payload}, _from, state) do
+    cond do
+      state.status != :waiting ->
+        {:reply, {:error, "ゲーム開始後はカスタム札を追加できません"}, state}
+      length(state.custom_cards) >= @custom_card_max ->
+        {:reply, {:error, "カスタム札はこのルームで最大#{@custom_card_max}枚までです"}, state}
+      true ->
+        card = %{
+          "id" => state.next_custom_id,
+          "fuda" => payload.fuda,
+          "yomi" => payload.yomi,
+          "image" => payload.image,
+          "category" => "カスタム",
+          "source" => "custom",
+          "uploaded_by" => name
+        }
+        new_state = %{state | custom_cards: state.custom_cards ++ [card], next_custom_id: state.next_custom_id + 1}
+        broadcast(state.players, %{type: "custom_card_added", card: card})
+        {:reply, {:ok, card}, new_state}
+    end
+  end
+
+  def handle_call({:remove_custom_card, name, card_id}, _from, state) do
+    case Enum.find(state.custom_cards, fn c -> c["id"] == card_id end) do
+      nil -> {:reply, {:error, "カードが見つかりません"}, state}
+      card ->
+        cond do
+          state.status != :waiting ->
+            {:reply, {:error, "ゲーム開始後は削除できません"}, state}
+          card["uploaded_by"] != name and state.host != name ->
+            {:reply, {:error, "このカードを削除する権限がありません"}, state}
+          true ->
+            new_list = Enum.reject(state.custom_cards, fn c -> c["id"] == card_id end)
+            broadcast(state.players, %{type: "custom_card_removed", id: card_id})
+            {:reply, :ok, %{state | custom_cards: new_list}}
+        end
+    end
+  end
 
   def handle_call({:start_game, settings, cards}, _from, state) do
     cond do
@@ -55,6 +102,8 @@ defmodule Realtime.Room do
         {:reply, {:error, "game already started"}, state}
       length(state.players) < 2 ->
         {:reply, {:error, "2人以上必要です"}, state}
+      length(cards) < 2 ->
+        {:reply, {:error, "カードが2枚以上必要です"}, state}
       true ->
         scores = Map.new(state.players, fn {_, n} -> {n, 0} end)
         new_state = %{state | status: :playing, settings: settings, cards: cards,

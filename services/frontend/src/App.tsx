@@ -23,7 +23,7 @@ export default function App() {
     return <Pokedex playerName={savedPlayerName} onClose={() => setShowPokedex(false)} />;
   }
   if (g.phase === "waiting" && g.room) {
-    return <WaitingRoom roomId={g.room.roomId} players={g.room.players} isHost={g.room.isHost} playerName={g.room.playerName} onLeave={g.leaveRoom} onStartGame={g.startGame} />;
+    return <WaitingRoom roomId={g.room.roomId} players={g.room.players} isHost={g.room.isHost} playerName={g.room.playerName} customCards={g.room.customCards} onLeave={g.leaveRoom} onStartGame={g.startGame} onAddCustomCard={g.addCustomCard} onRemoveCustomCard={g.removeCustomCard} errorMsg={g.errorMsg} />;
   }
   if (g.phase === "playing" && g.room) {
     return <GameBoard room={g.room} onTakeCard={g.takeCard} onNextCard={g.nextCard} isFouled={g.isFouled} cardResolved={g.cardResolved} />;
