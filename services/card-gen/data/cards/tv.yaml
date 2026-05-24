@@ -39,3 +39,21 @@ cards:
     yomi: そんなに興奮しないでください。お疲れ様でした。
     image: そんなに興奮しないで.jpg
     category: テレビ
+
+  - id: 55
+    fuda: 号泣会見
+    yomi: この日本を―変えようと思ってー(´;ω;｀)(´;ω;｀)
+    image: この日本.png
+    category: SNS
+
+  - id: 59
+    fuda: STAP
+    yomi: STAP(スタップ)細胞はあります！
+    image: 細胞は.png
+    category: SNS
+
+  - id: 61
+    fuda: 爆〇
+    yomi: これ言っていいのかな
+    image: これいって.png
+    category: テレビ

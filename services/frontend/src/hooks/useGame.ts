@@ -3,7 +3,14 @@ import { useSocket } from "./useSocket";
 
 export type Phase = "idle" | "connecting" | "waiting" | "playing" | "finished" | "error";
 
-export interface Card { id: number; fuda: string; yomi: string; image: string; }
+export interface Card {
+  id: number;
+  fuda: string;
+  yomi: string;
+  image: string;
+  source?: "official" | "custom";
+  uploaded_by?: string;
+}
 
 export interface GameSettings {
   yomite_mode: "ai" | "player";
@@ -28,7 +35,10 @@ export interface RoomState {
   isHost: boolean;
   playerName: string;
   game: GameState | null;
+  customCards: Card[];
 }
+
+export const CUSTOM_CARD_MAX = 10;
 
 const GATEWAY_URL =
   (import.meta as unknown as { env: Record<string, string> }).env
@@ -54,11 +64,16 @@ export function useGame() {
   const handleMessage = useCallback((msg: Record<string, unknown>) => {
     const t = msg.type;
     if (t === "room_created") {
-      setRoom({ roomId: String(msg.room_id), players: [String(msg.player_name)], isHost: true, playerName: String(msg.player_name), game: null });
+      setRoom({ roomId: String(msg.room_id), players: [String(msg.player_name)], isHost: true, playerName: String(msg.player_name), game: null, customCards: [] });
       setPhase("waiting");
     } else if (t === "room_joined") {
-      setRoom({ roomId: String(msg.room_id), players: (msg.players as string[]) ?? [], isHost: false, playerName: playerNameRef.current, game: null });
+      setRoom({ roomId: String(msg.room_id), players: (msg.players as string[]) ?? [], isHost: false, playerName: playerNameRef.current, game: null, customCards: (msg.custom_cards as Card[]) ?? [] });
       setPhase("waiting");
+    } else if (t === "custom_card_added") {
+      setRoom((p) => p ? { ...p, customCards: [...p.customCards, msg.card as Card] } : p);
+    } else if (t === "custom_card_removed") {
+      const removedId = msg.id as number;
+      setRoom((p) => p ? { ...p, customCards: p.customCards.filter((c) => c.id !== removedId) } : p);
     } else if (t === "player_joined") {
       setRoom((p) => p ? { ...p, players: [...p.players, String(msg.player_name)] } : p);
     } else if (t === "player_left") {
@@ -80,7 +95,7 @@ export function useGame() {
       const winner = String(msg.winner ?? "");
       setCardResolved(true);
       setRoom((p) => p?.game ? { ...p, game: { ...p.game, takenCardIds: new Set([...p.game.takenCardIds, cardId]), scores: msg.scores as Record<string, number> } } : p);
-      if (winner && winner === playerNameRef.current) recordCollected(winner, cardId);
+      if (winner && winner === playerNameRef.current && cardId > 0 && cardId < 1_000_000) recordCollected(winner, cardId);
     } else if (t === "game_over") {
       setRoom((p) => p?.game ? { ...p, game: { ...p.game, scores: msg.scores as Record<string, number> } } : p);
       setPhase("finished");
@@ -132,7 +147,16 @@ export function useGame() {
   const startGame = useCallback((settings: GameSettings) => send({ type: "start_game", ...settings }), [send]);
   const nextCard = useCallback(() => send({ type: "next_card" }), [send]);
   const takeCard = useCallback((cardId: number) => send({ type: "take_card", card_id: cardId }), [send]);
+  const addCustomCard = useCallback(
+    (input: { fuda: string; yomi: string; image: string }) =>
+      send({ type: "add_custom_card", fuda: input.fuda, yomi: input.yomi, image: input.image }),
+    [send]
+  );
+  const removeCustomCard = useCallback(
+    (id: number) => send({ type: "remove_custom_card", id }),
+    [send]
+  );
   const resetError = useCallback(() => { setPhase("idle"); setErrorMsg(null); }, []);
 
-  return { phase, room, errorMsg, isFouled, cardResolved, createRoom, joinRoom, leaveRoom, startGame, nextCard, takeCard, resetError };
+  return { phase, room, errorMsg, isFouled, cardResolved, createRoom, joinRoom, leaveRoom, startGame, nextCard, takeCard, addCustomCard, removeCustomCard, resetError };
 }

@@ -45,3 +45,57 @@ cards:
     yomi: しかしギャラクティック・ノヴァには狙いがあった
     image: しかしギャラクティックノヴァ.jpg
     category: SNS
+
+  - id: 51
+    fuda: 戸塚ヨット
+    yomi: 体罰は善なんよ
+    image: 体罰は.jpg
+    category: SNS
+
+  - id: 52
+    fuda: 笑うな！
+    yomi: お前ら笑うな！！
+    image: お前ら.png
+    category: SNS
+
+  - id: 53
+    fuda: ゲームのカード
+    yomi: ゲームのカード落としちゃった(´;ω;｀)
+    image: ゲームのカード.png
+    category: SNS
+
+  - id: 54
+    fuda: 領域展開
+    yomi: おなかがすいたらご飯を食べに行こう
+    image: 領域展開.png
+    category: SNS
+
+  - id: 56
+    fuda: ホリエモン
+    yomi: 野菜食えよ？？お前野菜はおいしいから食うの！
+    image: 野菜.png
+    category: SNS
+
+  - id: 57
+    fuda: OMMC
+    yomi: いっききーのーきー
+    image: OMMC.png
+    category: SNS
+
+  - id: 58
+    fuda: すするTV
+    yomi: 食べての技術が試される一杯かなと
+    image: 食べての技術.png
+    category: SNS
+
+  - id: 60
+    fuda: ぺこーら
+    yomi: ぺこーらに告白しようと思ってる
+    image: ぺこーら.png
+    category: SNS
+
+  - id: 61
+    fuda: 森羅万象
+    yomi: もりらばんぞう
+    image: もりら.png
+    category: SNS

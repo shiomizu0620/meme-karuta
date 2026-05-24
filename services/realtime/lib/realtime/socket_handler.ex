@@ -3,6 +3,9 @@ defmodule Realtime.SocketHandler do
   @name_min 1
   @name_max 12
   @max_players_limit 8
+  @custom_fuda_max 64
+  @custom_yomi_max 256
+  @custom_image_max 350_000
 
   @impl true
   def init(req, _opts), do: {:cowboy_websocket, req, %{room_id: nil, player_name: nil}}
@@ -50,8 +53,35 @@ defmodule Realtime.SocketHandler do
     with :ok <- validate_name(name),
          :ok <- validate_room_id(room_id) do
       case Realtime.Room.join(room_id, self(), name) do
-        {:ok, players} -> reply(%{type: "room_joined", room_id: room_id, players: players},
-                                %{state | room_id: room_id, player_name: name})
+        {:ok, players} ->
+          customs = Realtime.Room.list_custom_cards(room_id)
+          reply(%{type: "room_joined", room_id: room_id, players: players, custom_cards: customs},
+                %{state | room_id: room_id, player_name: name})
+        {:error, reason} -> reply(error(reason), state)
+      end
+    else
+      {:error, reason} -> reply(error(reason), state)
+    end
+  end
+
+  defp dispatch(%{"type" => "add_custom_card"} = msg, state) do
+    with {:ok, room_id} <- require_in_room(state),
+         {:ok, payload} <- validate_custom_card(msg) do
+      case Realtime.Room.add_custom_card(room_id, state.player_name, payload) do
+        {:ok, _card} -> {:ok, state}
+        {:error, reason} -> reply(error(reason), state)
+      end
+    else
+      {:error, reason} -> reply(error(reason), state)
+    end
+  end
+
+  defp dispatch(%{"type" => "remove_custom_card"} = msg, state) do
+    card_id = Map.get(msg, "id")
+    with {:ok, room_id} <- require_in_room(state),
+         :ok <- validate_card_id(card_id) do
+      case Realtime.Room.remove_custom_card(room_id, state.player_name, card_id) do
+        :ok -> {:ok, state}
         {:error, reason} -> reply(error(reason), state)
       end
     else
@@ -68,8 +98,11 @@ defmodule Realtime.SocketHandler do
     selected_sets = Map.get(msg, "selected_sets", [])
     with {:ok, room_id} <- require_in_room(state),
          :ok <- require_host(room_id, state.player_name),
-         {:ok, cards} <- fetch_cards(selected_sets),
-         {:ok, shuffled} <- shuffle_cards(cards) do
+         customs = Realtime.Room.list_custom_cards(room_id),
+         {:ok, official} <- fetch_cards(selected_sets, customs),
+         merged = official ++ customs,
+         :ok <- ensure_nonempty(merged),
+         {:ok, shuffled} <- shuffle_cards(merged) do
       settings = %{"yomite_mode" => Map.get(msg, "yomite_mode", "ai"),
                    "yomite_name" => Map.get(msg, "yomite_name", state.player_name),
                    "end_mode" => Map.get(msg, "end_mode", "count"),
@@ -127,7 +160,8 @@ defmodule Realtime.SocketHandler do
 
   defp dispatch(_, state), do: reply(error("unknown message type"), state)
 
-  defp fetch_cards(selected_sets) when is_list(selected_sets) do
+  defp fetch_cards([], customs) when is_list(customs) and customs != [], do: {:ok, []}
+  defp fetch_cards(selected_sets, _customs) when is_list(selected_sets) do
     sets_qs = case selected_sets do
       [] -> ""
       ids -> "?sets=" <> Enum.join(ids, ",")
@@ -143,6 +177,29 @@ defmodule Realtime.SocketHandler do
       _ -> {:error, "カードの取得に失敗しました"}
     end
   end
+
+  defp ensure_nonempty([]), do: {:error, "カードが選ばれていません"}
+  defp ensure_nonempty([_]), do: {:error, "カードが2枚以上必要です"}
+  defp ensure_nonempty(_), do: :ok
+
+  defp validate_custom_card(%{"fuda" => fuda, "yomi" => yomi, "image" => image})
+       when is_binary(fuda) and is_binary(yomi) and is_binary(image) do
+    f = String.trim(fuda)
+    y = String.trim(yomi)
+    cond do
+      String.length(f) < 1 or String.length(f) > @custom_fuda_max ->
+        {:error, "絵札名は1〜#{@custom_fuda_max}文字で入力してください"}
+      String.length(y) < 1 or String.length(y) > @custom_yomi_max ->
+        {:error, "読み文は1〜#{@custom_yomi_max}文字で入力してください"}
+      not String.starts_with?(image, "data:image/") ->
+        {:error, "画像形式が不正です"}
+      byte_size(image) > @custom_image_max ->
+        {:error, "画像サイズが大きすぎます"}
+      true ->
+        {:ok, %{fuda: f, yomi: y, image: image}}
+    end
+  end
+  defp validate_custom_card(_), do: {:error, "カスタムカードの形式が不正です"}
 
   defp shuffle_cards(cards) do
     ids = Enum.map(cards, & &1["id"])

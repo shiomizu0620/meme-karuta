@@ -49,6 +49,7 @@ export function EfudaCard({ card, taken, takenBy, isMe, onClick, collectionMode 
             onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}
           />
           <p className="efuda__fuda">{card.fuda}</p>
+          {card.source === "custom" && <span className="efuda__badge">カスタム</span>}
           {taken && takenBy && (<div className="efuda__taken-overlay"><span>{takenBy}</span></div>)}
         </div>
         <div className="efuda__face efuda__face--back">

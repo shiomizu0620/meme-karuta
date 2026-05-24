@@ -485,6 +485,194 @@ body {
   font-weight: 600;
 }
 
+/* ---- Custom Cards ---- */
+.custom-cards {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  border: 2px solid var(--text);
+  border-radius: 2px;
+  background: var(--card);
+}
+
+.custom-cards__title {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.custom-cards__count {
+  font-size: 12px;
+  color: var(--text-dim);
+  font-weight: 500;
+}
+
+.custom-cards__hint {
+  margin: 0;
+  font-size: 12px;
+  color: var(--text-dim);
+}
+
+.custom-cards__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.custom-cards__item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px;
+  border: 1px solid var(--text);
+  border-radius: 2px;
+  background: #fff;
+}
+
+.custom-cards__thumb {
+  width: 44px;
+  height: 44px;
+  object-fit: cover;
+  border: 1px solid var(--text);
+  flex-shrink: 0;
+}
+
+.custom-cards__meta {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.custom-cards__fuda {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.custom-cards__yomi {
+  font-size: 11px;
+  color: var(--text-dim);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.custom-cards__uploader {
+  font-size: 10px;
+  color: var(--text-dim);
+}
+
+.custom-cards__remove {
+  appearance: none;
+  border: 1px solid var(--danger);
+  background: transparent;
+  color: var(--danger);
+  font-size: 11px;
+  padding: 4px 8px;
+  cursor: pointer;
+  border-radius: 2px;
+  flex-shrink: 0;
+}
+
+.custom-cards__form {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding-top: 6px;
+  border-top: 1px dashed var(--text-dim);
+}
+
+.custom-cards__file-label {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px;
+  border: 2px dashed var(--text);
+  border-radius: 2px;
+  font-size: 13px;
+  cursor: pointer;
+  background: #fff;
+}
+
+.custom-cards__file-label input[type="file"] {
+  display: none;
+}
+
+.custom-cards__preview {
+  max-width: 120px;
+  max-height: 120px;
+  align-self: center;
+  border: 1px solid var(--text);
+}
+
+.custom-cards__input,
+.custom-cards__textarea {
+  font-family: inherit;
+  font-size: 13px;
+  padding: 6px 8px;
+  border: 1px solid var(--text);
+  border-radius: 2px;
+  background: #fff;
+  color: var(--text);
+}
+
+.custom-cards__textarea {
+  resize: vertical;
+}
+
+.custom-cards__error {
+  margin: 0;
+  font-size: 12px;
+  color: var(--danger);
+  font-weight: 600;
+}
+
+.custom-cards__add {
+  appearance: none;
+  border: 2px solid var(--text);
+  padding: 8px;
+  border-radius: 2px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  background: var(--accent);
+  color: #fff;
+  box-shadow: 2px 2px 0 var(--text);
+}
+
+.custom-cards__add:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* ---- EfudaCard custom badge ---- */
+.efuda__badge {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  font-size: 10px;
+  padding: 2px 6px;
+  background: var(--accent);
+  color: #fff;
+  border-radius: 2px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  pointer-events: none;
+}
+
 /* ---- ScoreBoard: Actions ---- */
 .scoreboard__actions {
   display: flex;
