@@ -11,6 +11,9 @@ build/
 *.o
 *.exe
 
+# TypeScript コンパイル出力 (フロントエンド)
+services/frontend/src/**/*.js
+
 # IDE
 .vscode/
 .idea/
