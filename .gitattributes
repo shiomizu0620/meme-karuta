@@ -1,0 +1,4 @@
+# Elixir / Erlang の依存ライブラリ (mix deps.get で取ってきたもの) は
+# vendored として扱う。GitHub Linguist の言語割合表示で cowboy / cowlib 等の
+# Erlang コードが大半を占めてしまうのを防ぐ目的。
+services/realtime/deps/** linguist-vendored=true
