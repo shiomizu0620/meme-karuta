@@ -5,6 +5,10 @@ use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use std::time::SystemTime;
 
+mod metrics;
+mod validation;
+mod health;
+
 // ---- リクエスト / レスポンス型 ----
 
 #[derive(Deserialize, Debug, Clone)]
