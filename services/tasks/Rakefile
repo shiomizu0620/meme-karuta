@@ -341,17 +341,13 @@ namespace :smoke do
     end
   end
 
-  desc "WebSocketの接続テスト"
+  desc "WebSocketの接続テスト (TCP到達性のみ)"
   task :websocket do
-    banner "WebSocket Smoke Test"
-    puts "Testing realtime service on ws://localhost:4000 ..."
-    puts "  Note: Full WebSocket test requires wscat or similar tool."
-    puts "  Basic TCP connectivity check..."
+    require "socket"
     begin
-      require "socket"
-      TCPSocket.open("localhost", 4000) { puts colorize("  Port 4000: reachable", :green) }
+      TCPSocket.open("localhost", 4000) { puts colorize("Port 4000: reachable", :green) }
     rescue => e
-      puts colorize("  Port 4000: unreachable (#{e.message})", :red)
+      puts colorize("Port 4000: unreachable (#{e.message})", :red)
       exit 1
     end
   end
@@ -406,40 +402,6 @@ end
 
 # ---- Canary deployment ----
 
-namespace :canary do
-  desc "1サービスを先行デプロイ → ヘルス確認 → 残りを展開 (rake canary:deploy[gateway])"
-  task :deploy, [:service] do |_, args|
-    canary = args[:service]&.to_sym
-    raise "Usage: rake canary:deploy[SERVICE_NAME]" unless canary && SERVICES.key?(canary)
-
-    banner "Canary deploy: #{canary} first"
-    docker_compose("up -d --no-deps --build #{canary}")
-    puts "Waiting 10s for #{canary} to stabilize..."
-    sleep 10
-
-    result = http_get_json(SERVICES[canary][:url])
-    unless result[:status] == 200
-      puts colorize("Canary FAILED (#{result[:error] || result[:status]}). Aborting rollout.", :red)
-      exit 1
-    end
-    puts colorize("Canary OK. Rolling out remaining services...", :green)
-
-    rest = SERVICES.keys - [canary]
-    rest.each do |svc|
-      puts "  Deploying #{svc}..."
-      docker_compose("up -d --no-deps #{svc}")
-      sleep 3
-      r = http_get_json(SERVICES[svc][:url])
-      if r[:status] != 200
-        puts colorize("  #{svc} FAILED post-deploy: #{r[:error]}", :red)
-      else
-        puts colorize("  #{svc} OK", :green)
-      end
-    end
-    puts colorize("Canary deploy complete.", :green)
-  end
-end
-
 # ---- Backup namespace: ロールバック前の構成バックアップ ----
 
 namespace :backup do
@@ -477,25 +439,17 @@ namespace :notify do
   def notify(level, message)
     FileUtils.mkdir_p(File.dirname(NOTIFY_LOG))
     File.open(NOTIFY_LOG, "a") { |f| f.puts "[#{Time.now.utc.iso8601}] #{level.to_s.upcase}: #{message}" }
-    case level
-    when :info  then puts colorize("[NOTIFY] #{message}", :cyan)
-    when :warn  then puts colorize("[NOTIFY] #{message}", :yellow)
-    when :error then puts colorize("[NOTIFY] #{message}", :red)
-    end
-  end
-
-  desc "テスト通知"
-  task :test do
-    notify(:info, "Test notification at #{Time.now}")
+    color = { info: :cyan, warn: :yellow, error: :red }[level] || :bold
+    puts colorize("[NOTIFY] #{message}", color)
   end
 
   desc "デプロイ完了通知"
   task :deployed do
     failed = check_all_services.select { |_, r| !r[:ok] }
     if failed.empty?
-      notify(:info, "Deploy completed successfully (#{SERVICES.size} services)")
+      notify(:info, "Deploy completed (#{SERVICES.size} services)")
     else
-      notify(:error, "Deploy completed but #{failed.size} service(s) unhealthy: #{failed.keys.join(', ')}")
+      notify(:error, "Deploy completed but #{failed.size} unhealthy: #{failed.keys.join(', ')}")
     end
   end
 end
