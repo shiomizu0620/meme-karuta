@@ -45,11 +45,26 @@ export function WaitingRoom({ roomId, players, isHost, playerName, customCards, 
 
   const hasContent = selectedSet !== "" || customCards.length > 0;
 
-  const copyRoomId = () => {
-    navigator.clipboard.writeText(roomId).then(() => {
+  const copyRoomId = async () => {
+    try {
+      if (navigator.clipboard && window.isSecureContext) {
+        await navigator.clipboard.writeText(roomId);
+      } else {
+        const ta = document.createElement("textarea");
+        ta.value = roomId;
+        ta.style.position = "fixed";
+        ta.style.opacity = "0";
+        document.body.appendChild(ta);
+        ta.focus();
+        ta.select();
+        document.execCommand("copy");
+        document.body.removeChild(ta);
+      }
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
-    });
+    } catch {
+      // copy failed silently
+    }
   };
 
   const selectSet = (id: string) => setSelectedSet(id);
