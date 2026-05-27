@@ -2,3 +2,7 @@
 # vendored として扱う。GitHub Linguist の言語割合表示で cowboy / cowlib 等の
 # Erlang コードが大半を占めてしまうのを防ぐ目的。
 services/realtime/deps/** linguist-vendored=true
+
+# styles.css は本プロジェクトの「10言語均等」設計思想に含まれないため
+# Linguist の言語統計から除外する。シンタックスハイライトはそのまま効く。
+services/frontend/src/styles.css linguist-detectable=false
