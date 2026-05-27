@@ -134,5 +134,15 @@ def render_report(cards: Iterable[CardDict] = None) -> str:
     return "\n".join(lines)
 
 
+def export_csv(cards: Iterable[CardDict] = None) -> str:
+    """カードを CSV テキスト形式で書き出す。"""
+    cards_list = list(cards) if cards is not None else list(CARDS)
+    rows = ["id,fuda,yomi,image,category,set"]
+    keys = ("id", "fuda", "yomi", "image", "category", "set")
+    for c in cards_list:
+        rows.append(",".join(str(c.get(k, "")).replace(",", "，") for k in keys))
+    return "\n".join(rows)
+
+
 if __name__ == "__main__":
     print(render_report())
