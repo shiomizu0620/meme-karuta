@@ -194,4 +194,10 @@ defmodule Realtime.Metrics do
     p95_idx = min(n - 1, trunc(n * 0.95))
     {avg, Enum.at(sorted, p95_idx)}
   end
+
+  @doc "人間可読なサマリーテキスト。/metrics.txt 用。"
+  def render_summary do
+    snap = snapshot()
+    "rooms=#{snap.rooms_active} players=#{snap.players_online} takes=#{snap.takes_total} latency_avg=#{snap.judge_latency_ms_avg}ms p95=#{snap.judge_latency_ms_p95}ms"
+  end
 end

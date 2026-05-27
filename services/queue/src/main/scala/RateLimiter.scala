@@ -31,6 +31,12 @@ class RateLimiter(capacity: Int, refillPerSec: Double) {
   /** 全バケットをまとめてクリアする。テスト用。 */
   def clearAll(): Unit = buckets.clear()
 
+  /** 現在のキーと残量のスナップショット。監視用。 */
+  def snapshot: Map[String, Double] = {
+    import scala.jdk.CollectionConverters._
+    buckets.asScala.iterator.map { case (k, b) => k -> b.peekTokens }.toMap
+  }
+
   private class Bucket(initial: Double) {
     private var tokens: Double = initial
     private var lastRefill: Long = System.nanoTime()
@@ -47,5 +53,7 @@ class RateLimiter(capacity: Int, refillPerSec: Double) {
         false
       }
     }
+
+    def peekTokens: Double = synchronized(tokens)
   }
 }
