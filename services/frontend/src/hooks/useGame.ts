@@ -78,6 +78,8 @@ export function useGame() {
       setRoom((p) => p ? { ...p, players: [...p.players, String(msg.player_name)] } : p);
     } else if (t === "player_left") {
       setRoom((p) => p ? { ...p, players: p.players.filter((x) => x !== String(msg.player_name)) } : p);
+    } else if (t === "host_changed") {
+      setRoom((p) => p ? { ...p, isHost: String(msg.host) === p.playerName } : p);
     } else if (t === "game_started") {
       setCardResolved(false);
       setRoom((p) => p ? { ...p, game: { cards: (msg.cards as Card[]) ?? [], settings: msg.settings as GameSettings, currentCard: null, currentCardIndex: -1, takenCardIds: new Set(), scores: {} } } : p);

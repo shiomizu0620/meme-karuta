@@ -76,6 +76,8 @@ type Config struct {
 	IdleTimeout   time.Duration
 	CBThreshold   int
 	CBOpenTimeout time.Duration
+
+	TrustedProxies []string
 }
 
 func loadConfig() Config {
@@ -94,6 +96,9 @@ func loadConfig() Config {
 		IdleTimeout:   getEnvDuration("IDLE_TIMEOUT", 60*time.Second),
 		CBThreshold:   getEnvInt("CB_THRESHOLD", 5),
 		CBOpenTimeout: getEnvDuration("CB_OPEN_TIMEOUT", 30*time.Second),
+
+		// nginx は compose のプライベートネットワークから来るので、そこからの X-Forwarded-For だけ信頼する
+		TrustedProxies: strings.Split(getEnv("TRUSTED_PROXIES", "10.0.0.0/8,172.16.0.0/12,192.168.0.0/16,127.0.0.1"), ","),
 	}
 }
 
@@ -126,59 +131,6 @@ func getEnvDuration(key string, fallback time.Duration) time.Duration {
 		return fallback
 	}
 	return d
-}
-
-// ---- レートリミッター（トークンバケット） ----
-
-type tokenBucket struct {
-	tokens   float64
-	lastTime time.Time
-}
-
-type RateLimiter struct {
-	mu      sync.Mutex
-	buckets map[string]*tokenBucket
-	limit   float64
-	burst   float64
-}
-
-func newRateLimiter(limit, burst int) *RateLimiter {
-	rl := &RateLimiter{
-		buckets: make(map[string]*tokenBucket),
-		limit:   float64(limit),
-		burst:   float64(burst),
-	}
-	go func() {
-		for range time.NewTicker(5 * time.Minute).C {
-			rl.mu.Lock()
-			cutoff := time.Now().Add(-5 * time.Minute)
-			for k, b := range rl.buckets {
-				if b.lastTime.Before(cutoff) {
-					delete(rl.buckets, k)
-				}
-			}
-			rl.mu.Unlock()
-		}
-	}()
-	return rl
-}
-
-func (rl *RateLimiter) Allow(key string) bool {
-	rl.mu.Lock()
-	defer rl.mu.Unlock()
-	now := time.Now()
-	b, ok := rl.buckets[key]
-	if !ok {
-		b = &tokenBucket{tokens: rl.burst, lastTime: now}
-		rl.buckets[key] = b
-	}
-	b.tokens = min(b.tokens+now.Sub(b.lastTime).Seconds()*rl.limit, rl.burst)
-	b.lastTime = now
-	if b.tokens < 1 {
-		return false
-	}
-	b.tokens--
-	return true
 }
 
 // ---- ヘルスチェッカー ----
@@ -622,7 +574,7 @@ func loggingMiddleware(next http.Handler) http.Handler {
 
 func rateLimitMiddleware(rl *RateLimiter, next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if !rl.Allow(clientIP(r)) {
+		if !rl.Allow(rl.clientKey(r)) {
 			w.Header().Set("Retry-After", "1")
 			writeError(w, r, http.StatusTooManyRequests, "RATE_LIMIT_EXCEEDED", "rate limit exceeded")
 			return
@@ -700,9 +652,11 @@ type server struct {
 }
 
 func newServer(cfg Config) *server {
+	rl := NewRateLimiter(float64(cfg.RateBurst), float64(cfg.RateLimit))
+	rl.TrustProxies(cfg.TrustedProxies...)
 	return &server{
 		cfg:     cfg,
-		rl:      newRateLimiter(cfg.RateLimit, cfg.RateBurst),
+		rl:      rl,
 		cb:      newCircuitBreaker(cfg.CBThreshold, cfg.CBOpenTimeout),
 		metrics: newMetrics(),
 	}
@@ -712,10 +666,11 @@ func (s *server) buildMux() *http.ServeMux {
 	proxy := func(name, target string) *upstreamProxy {
 		return newUpstreamProxy(name, target, s.cb)
 	}
+	// judge は realtime からだけ呼ぶ内部 API。外に出すと誰でも札の先取りや
+	// /reset ができてしまうので、ゲートウェイからはルーティングしない（ヘルスチェックのみ）。
 	routes := []struct{ path, name, target string }{
 		{"/api/cards", "card-gen", s.cfg.CardGenURL},
 		{"/api/shuffle", "shuffle", s.cfg.ShuffleURL},
-		{"/api/judge", "judge", s.cfg.JudgeURL},
 		{"/api/queue", "queue", s.cfg.QueueURL},
 		{"/api/serial", "serializer", s.cfg.SerializerURL},
 		{"/api/pokedex", "pokedex", s.cfg.PokedexURL},
@@ -794,7 +749,6 @@ func (s *server) handleRoutes(w http.ResponseWriter, r *http.Request) {
 	routes := []map[string]string{
 		{"path": "/api/cards",      "upstream": "card-gen",   "desc": "カードデータの取得"},
 		{"path": "/api/shuffle",    "upstream": "shuffle",    "desc": "シャッフル API"},
-		{"path": "/api/judge",      "upstream": "judge",      "desc": "先着判定 API"},
 		{"path": "/api/queue",      "upstream": "queue",      "desc": "イベントキュー API"},
 		{"path": "/api/serial",     "upstream": "serializer", "desc": "バイナリシリアライザ"},
 		{"path": "/api/pokedex",    "upstream": "pokedex",    "desc": "コレクション管理 API"},
@@ -871,5 +825,6 @@ func main() {
 	if err := httpSrv.Shutdown(ctx); err != nil {
 		log.Printf("graceful shutdown failed: %v", err)
 	}
+	srv.rl.Stop()
 	log.Println("gateway stopped")
 }

@@ -11,18 +11,26 @@ import (
 	"time"
 )
 
-func TestRateLimiterAllowsBurstThenBlocks(t *testing.T) {
-	rl := newRateLimiter(1, 3)
-	for i := 0; i < 3; i++ {
-		if !rl.Allow("1.2.3.4") {
-			t.Fatalf("burst token %d should be allowed", i)
-		}
+func TestRateLimitMiddlewareKeysByForwardedClient(t *testing.T) {
+	srv := newServer(Config{RateLimit: 1, RateBurst: 1, TrustedProxies: []string{"172.16.0.0/12"}})
+	defer srv.rl.Stop()
+	h := rateLimitMiddleware(srv.rl, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}))
+	send := func(client string) int {
+		r := httptest.NewRequest(http.MethodGet, "/api/cards", nil)
+		r.RemoteAddr = "172.18.0.2:5555" // nginx コンテナ
+		r.Header.Set("X-Forwarded-For", client)
+		w := httptest.NewRecorder()
+		h.ServeHTTP(w, r)
+		return w.Code
 	}
-	if rl.Allow("1.2.3.4") {
-		t.Fatal("4th immediate request should be blocked")
+	if send("203.0.113.1") != http.StatusOK {
+		t.Fatal("first client should pass")
 	}
-	if !rl.Allow("9.9.9.9") {
-		t.Fatal("different key should have its own bucket")
+	if send("203.0.113.2") != http.StatusOK {
+		t.Fatal("another client behind the same proxy should have its own bucket")
+	}
+	if send("203.0.113.1") != http.StatusTooManyRequests {
+		t.Fatal("first client should be limited on its second request")
 	}
 }
 
@@ -37,6 +45,17 @@ func TestCircuitBreakerOpensAfterThreshold(t *testing.T) {
 	time.Sleep(60 * time.Millisecond)
 	if !cb.Allow("svc") {
 		t.Fatal("breaker should allow half-open probe after timeout")
+	}
+}
+
+func TestJudgeIsNotRoutedPublicly(t *testing.T) {
+	mux := newServer(loadConfig()).buildMux()
+	for _, p := range []string{"/api/judge", "/api/judge/judge", "/api/judge/reset/ROOM1"} {
+		w := httptest.NewRecorder()
+		mux.ServeHTTP(w, httptest.NewRequest(http.MethodPost, p, nil))
+		if w.Code != http.StatusNotFound {
+			t.Fatalf("%s: expected 404, got %d", p, w.Code)
+		}
 	}
 }
 

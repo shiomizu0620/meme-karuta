@@ -102,7 +102,6 @@ docker compose up --build frontend gateway
 |------|------|------|
 | `GET /api/cards` | card-gen | カードデータ・セット一覧 |
 | `POST /api/shuffle` | shuffle | カード ID 配列のシャッフル |
-| `POST /api/judge` | judge | 先着判定 (タップ順序の確定) |
 | `POST /api/queue` | queue | ゲームイベントの記録 |
 | `POST /api/serial` | serializer | カードデータのバイナリ変換 |
 | `* /api/pokedex/...` | pokedex | プレイヤーごとの収集カード管理 |

@@ -133,12 +133,14 @@ func (rl *RateLimiter) clientKey(r *http.Request) string {
 	if xff == "" {
 		return remote
 	}
+	// nginx の $proxy_add_x_forwarded_for はクライアント送信値の末尾に実 IP を追記する。
+	// 先頭はクライアントが自由に偽装できるので、信頼できるプロキシが付けた末尾を使う。
 	parts := strings.Split(xff, ",")
-	first := strings.TrimSpace(parts[0])
-	if first == "" {
+	last := strings.TrimSpace(parts[len(parts)-1])
+	if last == "" {
 		return remote
 	}
-	return first
+	return last
 }
 
 func (rl *RateLimiter) isTrustedProxy(ip string) bool {
