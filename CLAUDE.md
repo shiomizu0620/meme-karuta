@@ -174,15 +174,18 @@ meme-karuta/
 gateway(Go) :8080
   ├── /api/cards    → card-gen(Python) :5000
   ├── /api/shuffle  → shuffle(Haskell) :5001
-  ├── /api/judge    → judge(Rust) :5002
   ├── /api/queue    → queue(Scala) :5003
   └── /api/serial   → serializer(C) :5004
 
 ブラウザ
   ↓ WebSocket
 realtime(Elixir) :4000
-  └── ルーム管理・全員への通知
+  ├── ルーム管理・全員への通知
+  └── 先着判定 → judge(Rust) :5002（内部専用。ゲートウェイには出さない）
 ```
+
+外部に公開するのは nginx の :80 だけ。各サービスのポートは docker-compose で
+`127.0.0.1` にのみバインドする。
 
 ---
 

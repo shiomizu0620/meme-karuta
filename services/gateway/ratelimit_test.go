@@ -128,6 +128,19 @@ func TestTrustedProxyHonorsXForwardedFor(t *testing.T) {
 	}
 }
 
+func TestSpoofedXForwardedForUsesProxyAppendedIP(t *testing.T) {
+	rl := NewRateLimiter(1, 0.01)
+	defer rl.Stop()
+	rl.TrustProxies("172.16.0.0/12")
+
+	r := httptest.NewRequest("GET", "/x", nil)
+	r.RemoteAddr = "172.18.0.5:1234"
+	r.Header.Set("X-Forwarded-For", "1.1.1.1, 203.0.113.7")
+	if key := rl.clientKey(r); key != "203.0.113.7" {
+		t.Errorf("expected proxy-appended IP, got key=%s", key)
+	}
+}
+
 func TestUntrustedProxyIgnoresXForwardedFor(t *testing.T) {
 	rl := NewRateLimiter(1, 0.01)
 	defer rl.Stop()

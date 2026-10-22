@@ -83,6 +83,33 @@ defmodule Realtime.RoomTest do
     assert "Alice" = Realtime.Room.get_host(room_id)
   end
 
+  test "joining with a name already in the room returns error", %{room_id: room_id} do
+    {:ok, _} = Realtime.Room.join(room_id, self(), "Alice")
+    impostor = spawn(fn -> receive do: (_ -> :ok) end)
+    assert {:error, _} = Realtime.Room.join(room_id, impostor, "Alice")
+    assert ["Alice"] = Realtime.Room.list_players(room_id)
+  end
+
+  test "host is handed to the next player when the host leaves", %{room_id: room_id} do
+    host = spawn(fn -> receive do: (_ -> :ok) end)
+    {:ok, _} = Realtime.Room.join(room_id, host, "Alice")
+    {:ok, _} = Realtime.Room.join(room_id, self(), "Bob")
+    Realtime.Room.leave(room_id, host)
+    assert_receive {:room_event, %{type: "host_changed", host: "Bob"}}, 500
+    assert "Bob" = Realtime.Room.get_host(room_id)
+  end
+
+  test "rejoining with the departed host's name does not grant host", %{room_id: room_id} do
+    host = spawn(fn -> receive do: (_ -> :ok) end)
+    {:ok, _} = Realtime.Room.join(room_id, host, "Alice")
+    {:ok, _} = Realtime.Room.join(room_id, self(), "Bob")
+    Realtime.Room.leave(room_id, host)
+    assert_receive {:room_event, %{type: "host_changed"}}, 500
+    impostor = spawn(fn -> receive do: (_ -> :ok) end)
+    {:ok, _} = Realtime.Room.join(room_id, impostor, "Alice")
+    assert "Bob" = Realtime.Room.get_host(room_id)
+  end
+
   test "player_count is updated as players join", %{room_id: room_id} do
     assert 0 = Realtime.Room.player_count(room_id)
     {:ok, _} = Realtime.Room.join(room_id, self(), "Alice")

@@ -42,6 +42,8 @@ defmodule Realtime.Room do
     cond do
       length(state.players) >= state.max_players -> {:reply, {:error, "room is full"}, state}
       Enum.any?(state.players, fn {p, _} -> p == pid end) -> {:reply, {:error, "already in room"}, state}
+      # ホスト・よみて・スコアは名前で識別しているので、同名の入室を許すと権限を乗っ取られる
+      Enum.any?(state.players, fn {_, n} -> n == name end) -> {:reply, {:error, "その名前は既にルーム内で使われています"}, state}
       true ->
         Process.monitor(pid)
         new_players = state.players ++ [{pid, name}]
@@ -234,10 +236,17 @@ defmodule Realtime.Room do
       {_, name} ->
         remaining = Enum.reject(state.players, fn {p, _} -> p == pid end)
         broadcast(remaining, %{type: "player_left", player_name: name})
-        new_state = %{state | players: remaining}
+        new_state = %{state | players: remaining, host: next_host(state.host, name, remaining)}
+        if new_state.host != state.host, do: broadcast(remaining, %{type: "host_changed", host: new_state.host})
         if remaining == [], do: {:stop, :normal, new_state}, else: {:noreply, new_state}
     end
   end
+
+  # ホストが抜けたら残っている最古参に引き継ぐ。抜けた名前を空けたままにすると、
+  # 同じ名前で入り直した別人がホスト権限を得てしまう。
+  defp next_host(host, leaving, [{_, first} | _]) when host == leaving, do: first
+  defp next_host(host, leaving, []) when host == leaving, do: nil
+  defp next_host(host, _leaving, _remaining), do: host
 
   defp broadcast(players, event), do: Enum.each(players, fn {pid, _} -> send(pid, {:room_event, event}) end)
   defp via(room_id), do: {:via, Registry, {Realtime.RoomRegistry, room_id}}
